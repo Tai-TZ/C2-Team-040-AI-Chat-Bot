@@ -5,6 +5,7 @@ __pycache__/
 .DS_Store
 models/
 .venv/
+node_modules/
 
 # Frontend UI
 frontend/node_modules/
