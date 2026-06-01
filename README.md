@@ -86,8 +86,17 @@ npm install
 npm run dev
 ```
 
-- **Chat trái**: hỏi AI qua DS2API (`POST /api/chat/stream` → `/v1/chat/completions`).
-- **Tab Vé & Chuyến bay**: chọn khu vực / địa điểm / ngày → **Xem giá vé** (dữ liệu từ `vinwonders_destinations_data.json` + API VinWonders).
+- **Chat trái**: **ReAct Agent** tra giá vé thật qua tools (`resolve_site` → `parse_visit_date` → `get_ticket_prices`), stream qua `POST /api/chat/stream`.
+- **Tab Vé & Chuyến bay**: chọn khu vực / địa điểm / ngày → **Xem giá vé** (cùng crawler với agent).
+
+### 3. Test agent (CLI)
+
+```bash
+python run_agent.py "T muốn đi Nha Trang cuối tuần sau, vé rẻ nhất bao nhiêu?"
+python chatbot.py "cùng câu hỏi"   # baseline không có tool (để so sánh lab)
+```
+
+Cấu hình agent trong `.env`: `AGENT_PROVIDER=ds2api`, `DS2API_API_KEY`, `DS2API_MODEL`.
 
 ---
 

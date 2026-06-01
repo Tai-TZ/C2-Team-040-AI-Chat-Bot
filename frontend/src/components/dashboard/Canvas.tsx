@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { subscribeOpenTicketsTab } from "@/lib/vinwonders-events";
 import { CalendarDays, Ticket, Sparkles, MapPin, Users, Clock } from "lucide-react";
 import { ItineraryTimeline } from "./ItineraryTimeline";
 import { TicketsFlights } from "./TicketsFlights";
@@ -15,6 +16,10 @@ type TabId = (typeof tabs)[number]["id"];
 
 export function Canvas() {
   const [tab, setTab] = useState<TabId>("tickets");
+
+  useEffect(() => {
+    return subscribeOpenTicketsTab(() => setTab("tickets"));
+  }, []);
 
   return (
     <div className="flex h-full flex-col bg-gradient-to-br from-background via-background to-accent/30">

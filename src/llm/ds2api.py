@@ -63,19 +63,21 @@ def chat_completion(
                 url, headers=_headers(), json=payload, timeout=timeout
             )
             resp.raise_for_status()
-            return resp.json()
+            return json.loads(resp.content.decode("utf-8"))
 
         resp = requests.post(
             url, headers=_headers(), json=payload, stream=True, timeout=timeout
         )
         resp.raise_for_status()
+        resp.encoding = "utf-8"
     except RequestsConnectionError as exc:
         raise ConnectionError(_connection_hint(exc)) from exc
 
     def _iter_lines() -> Generator[str, None, None]:
-        for line in resp.iter_lines(decode_unicode=True):
-            if line is not None:
-                yield line
+        # Decode bytes as UTF-8 — requests defaults SSE to ISO-8859-1 (breaks Vietnamese).
+        for line in resp.iter_lines():
+            if line:
+                yield line.decode("utf-8")
 
     return _iter_lines()
 

@@ -8,8 +8,9 @@ import {
   Calendar,
   Loader2,
 } from "lucide-react";
+import { AssistantMessage } from "@/components/dashboard/AssistantMessage";
 import { streamChat } from "@/lib/chat-api";
-import type { ChatMessage } from "@/lib/chat-types";
+import type { ChatAction, ChatMessage } from "@/lib/chat-types";
 
 const quickActions = [
   { label: "Lên kế hoạch cuối tuần", icon: Calendar },
@@ -32,6 +33,7 @@ export function ChatPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -59,6 +61,7 @@ export function ChatPanel() {
       setMessages([...messages.filter((m) => m.id !== "welcome"), userMsg]);
       setInput("");
       setLoading(true);
+      setStatus("Agent đang xử lý...");
       setError(null);
 
       setMessages((prev) => [
@@ -67,21 +70,34 @@ export function ChatPanel() {
       ]);
 
       try {
-        await streamChat(history, (delta) => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? { ...m, content: m.content + delta }
-                : m,
-            ),
-          );
-        });
+        await streamChat(
+          history,
+          (delta) => {
+            setStatus(null);
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId
+                  ? { ...m, content: m.content + delta }
+                  : m,
+              ),
+            );
+          },
+          (trace) => setStatus(trace),
+          (structured) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, structured } : m,
+              ),
+            );
+          },
+        );
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Lỗi kết nối AI";
         setError(msg);
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));
       } finally {
         setLoading(false);
+        setStatus(null);
       }
     },
     [loading, messages],
@@ -91,6 +107,12 @@ export function ChatPanel() {
     setMessages([WELCOME]);
     setError(null);
     setInput("");
+  }
+
+  function handleMessageAction(action: ChatAction) {
+    if (action.kind === "message") {
+      sendMessage(action.text);
+    }
   }
 
   return (
@@ -143,8 +165,13 @@ export function ChatPanel() {
               {m.role === "assistant" && !m.content && loading ? (
                 <span className="inline-flex items-center gap-2 text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Đang suy nghĩ...
+                  {status ?? "Agent đang tra cứu..."}
                 </span>
+              ) : m.role === "assistant" ? (
+                <AssistantMessage
+                  message={m}
+                  onAction={handleMessageAction}
+                />
               ) : (
                 <p className="whitespace-pre-wrap">{m.content}</p>
               )}
@@ -163,9 +190,10 @@ export function ChatPanel() {
         <div className="mx-5 mb-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
           {error}
           <p className="mt-1 text-muted-foreground">
-            Thường do <strong>DS2API chưa chạy</strong> trên port 5001. Mở terminal khác,
-            start DS2API, rồi thử lại. API key đặt trong{" "}
-            <code className="rounded bg-muted px-1">.env</code> (DS2API_API_KEY).
+            Kiểm tra backend{" "}
+            <code className="rounded bg-muted px-1">python -m src.vinwonders.server</code>{" "}
+            và <code className="rounded bg-muted px-1">DS2API_API_KEY</code> trong file{" "}
+            <code className="rounded bg-muted px-1">.env</code>.
           </p>
         </div>
       )}

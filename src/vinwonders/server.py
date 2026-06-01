@@ -1,11 +1,12 @@
-"""FastAPI: VinWonders prices + DS2API chat proxy."""
+"""FastAPI: VinWonders prices + ReAct agent chat."""
 
 from __future__ import annotations
 
 import json
 import re
+from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
@@ -13,7 +14,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from src.agent.agent import ReActAgent
+from src.core.factory import get_llm_provider
 from src.llm import ds2api
+from src.tools.registry import VINWONDERS_TOOLS
 from src.vinwonders.crawler import get_ticket_prices
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -52,42 +56,27 @@ class ChatRequest(BaseModel):
     stream: bool = False
 
 
-def _build_system_prompt() -> str:
-    dest_lines: list[str] = []
-    try:
-        data = _load_destinations()
-        for region in data.get("destinations", []):
-            name = region.get("destination_name", "")
-            sites = ", ".join(
-                s.get("name", "") for s in region.get("sub_locations", [])[:6]
-            )
-            dest_lines.append(f"- {name}: {sites}")
-    except Exception:
-        pass
-
-    destinations_block = (
-        "\n".join(dest_lines) if dest_lines else "- Xem tab Vé & Chuyến bay trên giao diện."
-    )
-
-    return f"""Bạn là VinWonders Tour Guide AI — trợ lý du lịch thân thiện, trả lời bằng tiếng Việt.
-
-Nhiệm vụ: tư vấn lịch trình, gợi ý vé VinWonders, combo, show và mẹo tiết kiệm.
-Người dùng có thể tra cứu **giá vé thật** ở tab "Vé & Chuyến bay" (chọn khu vực, địa điểm, ngày).
-
-Các điểm đến hỗ trợ:
-{destinations_block}
-
-Quy tắc:
-- Ngắn gọn, có bullet khi liệt kê; không bịa giá — nếu cần giá cụ thể hãy nhắc dùng tab tra cứu vé.
-- Ưu tiên gợi ý thực tế (thời gian, di chuyển, combo vé+show).
-"""
+@lru_cache(maxsize=1)
+def _get_agent() -> ReActAgent:
+    return ReActAgent(get_llm_provider(), VINWONDERS_TOOLS, max_steps=8)
 
 
-def _chat_messages(user_messages: list[ChatMessage]) -> list[dict[str, str]]:
-    return [
-        {"role": "system", "content": _build_system_prompt()},
-        *[{"role": m.role, "content": m.content} for m in user_messages],
-    ]
+def _conversation_context(messages: list[ChatMessage]) -> str | None:
+    """Prior turns (excluding latest user message)."""
+    if len(messages) <= 1:
+        return None
+    lines: list[str] = []
+    for m in messages[:-1]:
+        role = "Khách" if m.role == "user" else "AI"
+        lines.append(f"{role}: {m.content}")
+    return "\n".join(lines[-10:])
+
+
+def _latest_user_message(messages: list[ChatMessage]) -> str:
+    for m in reversed(messages):
+        if m.role == "user":
+            return m.content
+    raise HTTPException(400, "No user message in request")
 
 
 def _normalize_date(date: str) -> str:
@@ -122,35 +111,79 @@ def chat(req: ChatRequest):
         raise HTTPException(400, "Use POST /api/chat/stream for streaming")
 
     try:
-        result = ds2api.chat_completion(
-            _chat_messages(req.messages), stream=False
+        agent = _get_agent()
+        text = agent.run(
+            _latest_user_message(req.messages),
+            conversation_context=_conversation_context(req.messages),
         )
-        assert isinstance(result, dict)
-        text = ds2api.extract_assistant_text(result)
-        return {"content": text, "model": result.get("model")}
+        from src.agent.structured import build_chat_structured
+
+        structured = build_chat_structured(agent.trace)
+        return {
+            "content": text,
+            "model": agent.llm.model_name,
+            "agent": True,
+            "trace": agent.trace,
+            "structured": structured,
+        }
     except ValueError as exc:
         raise HTTPException(500, str(exc)) from exc
     except ConnectionError as exc:
         raise HTTPException(503, str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(502, f"DS2API error: {exc}") from exc
+        raise HTTPException(502, f"Agent error: {exc}") from exc
+
+
+def _sse_payload(obj: dict[str, Any]) -> str:
+    return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n"
 
 
 @app.post("/api/chat/stream")
 def chat_stream(req: ChatRequest):
     try:
-        stream = ds2api.chat_completion(
-            _chat_messages(req.messages), stream=True
-        )
-        assert not isinstance(stream, dict)
+        agent = _get_agent()
+        user_msg = _latest_user_message(req.messages)
+        context = _conversation_context(req.messages)
 
         def generate():
-            for line in stream:
-                yield f"{line}\n"
+            try:
+                for event in agent.run_with_events(
+                    user_msg, conversation_context=context
+                ):
+                    if event.get("type") == "trace":
+                        yield _sse_payload(
+                            {
+                                "type": "trace",
+                                "message": event.get("message", ""),
+                            }
+                        )
+                    elif event.get("type") == "structured":
+                        yield _sse_payload(
+                            {
+                                "type": "structured",
+                                "data": event.get("data"),
+                            }
+                        )
+                    elif event.get("type") == "content":
+                        yield _sse_payload(
+                            {
+                                "choices": [
+                                    {
+                                        "delta": {
+                                            "content": event.get("delta", "")
+                                        }
+                                    }
+                                ]
+                            }
+                        )
+                yield "data: [DONE]\n\n"
+            except Exception as exc:
+                yield _sse_payload({"type": "error", "message": str(exc)})
+                yield "data: [DONE]\n\n"
 
         return StreamingResponse(
             generate(),
-            media_type="text/event-stream",
+            media_type="text/event-stream; charset=utf-8",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
     except ValueError as exc:
@@ -158,7 +191,7 @@ def chat_stream(req: ChatRequest):
     except ConnectionError as exc:
         raise HTTPException(503, str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(502, f"DS2API error: {exc}") from exc
+        raise HTTPException(502, f"Agent error: {exc}") from exc
 
 
 @app.get("/api/destinations")

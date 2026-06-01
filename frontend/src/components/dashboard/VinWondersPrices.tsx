@@ -5,6 +5,10 @@ import {
   fetchTicketPrices,
   formatVnd,
 } from "@/lib/vinwonders-api";
+import {
+  subscribeOpenTicketsTab,
+  usingDateToIso,
+} from "@/lib/vinwonders-events";
 import type { Destination, PricesResponse } from "@/lib/vinwonders-types";
 
 function defaultIsoDate(): string {
@@ -25,6 +29,7 @@ export function VinWondersPrices() {
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [priceError, setPriceError] = useState<string | null>(null);
   const [prices, setPrices] = useState<PricesResponse | null>(null);
+  const [autoSearch, setAutoSearch] = useState(false);
 
   useEffect(() => {
     fetchDestinations()
@@ -53,6 +58,19 @@ export function VinWondersPrices() {
     }
   }, [sites, siteCode]);
 
+  useEffect(() => {
+    return subscribeOpenTicketsTab((detail) => {
+      if (!detail.supplierCode || destinations.length === 0) return;
+      const regionMatch = destinations.find((d) =>
+        d.sub_locations.some((s) => s.code === detail.supplierCode),
+      );
+      if (regionMatch) setRegionCode(regionMatch.destination_code);
+      setSiteCode(detail.supplierCode);
+      if (detail.usingDate) setVisitDate(usingDateToIso(detail.usingDate));
+      setAutoSearch(true);
+    });
+  }, [destinations]);
+
   const selectedSite = sites.find((s) => s.code === siteCode);
 
   async function handleSearch() {
@@ -69,6 +87,13 @@ export function VinWondersPrices() {
       setLoadingPrices(false);
     }
   }
+
+  useEffect(() => {
+    if (!autoSearch || !siteCode || !visitDate) return;
+    setAutoSearch(false);
+    void handleSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- trigger once after chat prefill
+  }, [autoSearch, siteCode, visitDate]);
 
   if (loadingMeta) {
     return (
