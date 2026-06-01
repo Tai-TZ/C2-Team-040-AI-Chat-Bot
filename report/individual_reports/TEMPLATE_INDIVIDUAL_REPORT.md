@@ -1,8 +1,8 @@
 # Individual Report: Lab 3 - Chatbot vs ReAct Agent
 
-- **Student Name**: Nguyễn Trọng Nguyên
-- **Student ID**: 2A202600548
-- **Date**: 01/06/2026
+- **Student Name**: [Your Name Here]
+- **Student ID**: [Your ID Here]
+- **Date**: [Date Here]
 
 ---
 
@@ -31,9 +31,9 @@
 
 *Reflect on the reasoning capability difference.*
 
-1.  **Reasoning**: How did the `Thought` block help the agent compared to a direct Chatbot answer?
-2.  **Reliability**: In which cases did the Agent actually perform *worse* than the Chatbot?
-3.  **Observation**: How did the environment feedback (observations) influence the next steps?
+1. **Reasoning**: How did the `Thought` block help the agent compared to a direct Chatbot answer?
+2. **Reliability**: In which cases did the Agent actually perform *worse* than the Chatbot?
+3. **Observation**: How did the environment feedback (observations) influence the next steps?
 
 ---
 
@@ -49,3 +49,4 @@
 
 > [!NOTE]
 > Submit this report by renaming it to `REPORT_[YOUR_NAME].md` and placing it in this folder.
+

@@ -13,18 +13,20 @@ Phần lớn công việc tập trung biến demo VinWonders thành hệ thống
 
 ### Modules đã triển khai / chỉnh sửa chính
 
-| Lớp | File / module | Đóng góp |
-| :--- | :--- | :--- |
-| **Crawler & API** | `src/vinwonders/crawler.py`, `server.py` | Proxy giá vé thật từ booking API; SSE chat `/api/chat/stream`; CORS; xử lý lỗi HTTP |
-| **Tools (5)** | `src/tools/destinations.py`, `dates.py`, `weather.py`, `prices.py`, `registry.py` | Tool spec VinWonders; `_sanitize_tool_args` map lỗi tham số LLM |
-| **ReAct Agent** | `src/agent/agent.py` | Vòng Thought–Action–Observation; bootstrap; guardrails; stream Final Answer; SSE `agent_step` |
-| **Agent v2** | `src/agent/bootstrap.py`, `guardrails.py`, `structured.py`, `trace.py` | Pipeline tự động; chặn Final Answer sớm; payload UI (giá, thời tiết, map) |
-| **Prompt** | `src/prompts/vinwonders.py` | Persona Karphany; prompt v1/v2; từ chối off-topic |
-| **Chatbot baseline** | `src/chatbot/vinwonders_chatbot.py`, `chatbot.py` | Một lần gọi LLM, không tool — đối chiếu với agent |
-| **Dữ liệu** | `vinwonders_destinations_data.json`, `destinations_data.py`, `destination_maps.py` | Điểm đến + tọa độ map embed nội bộ |
-| **Telemetry** | `src/telemetry/metrics.py`, `logger.py` | `LLM_METRIC`: token, latency, `cost_estimate_usd`, ratio; `GET /api/telemetry/session` |
-| **Frontend** | `ChatPanel.tsx`, `AILoadingState.tsx`, `AgentActivityPanel.tsx`, `VinWondersMapEmbed.tsx`, `chat-api.ts` | Loading state, trace agent, map trong câu trả lời, streaming |
-| **Lab 3 deliverables** | `main.py`, `scripts/eval_lab3.py`, `tests/test_vinwonders_scoring.py`, `report/group_report/GROUP_REPORT_C2-Team-040.md` | So sánh chatbot/agent; eval offline; group report |
+
+| Lớp                    | File / module                                                                                                            | Đóng góp                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| **Crawler & API**      | `src/vinwonders/crawler.py`, `server.py`                                                                                 | Proxy giá vé thật từ booking API; SSE chat `/api/chat/stream`; CORS; xử lý lỗi HTTP           |
+| **Tools (5)**          | `src/tools/destinations.py`, `dates.py`, `weather.py`, `prices.py`, `registry.py`                                        | Tool spec VinWonders; `_sanitize_tool_args` map lỗi tham số LLM                               |
+| **ReAct Agent**        | `src/agent/agent.py`                                                                                                     | Vòng Thought–Action–Observation; bootstrap; guardrails; stream Final Answer; SSE `agent_step` |
+| **Agent v2**           | `src/agent/bootstrap.py`, `guardrails.py`, `structured.py`, `trace.py`                                                   | Pipeline tự động; chặn Final Answer sớm; payload UI (giá, thời tiết, map)                     |
+| **Prompt**             | `src/prompts/vinwonders.py`                                                                                              | Persona Karphany; prompt v1/v2; từ chối off-topic                                             |
+| **Chatbot baseline**   | `src/chatbot/vinwonders_chatbot.py`, `chatbot.py`                                                                        | Một lần gọi LLM, không tool — đối chiếu với agent                                             |
+| **Dữ liệu**            | `vinwonders_destinations_data.json`, `destinations_data.py`, `destination_maps.py`                                       | Điểm đến + tọa độ map embed nội bộ                                                            |
+| **Telemetry**          | `src/telemetry/metrics.py`, `logger.py`                                                                                  | `LLM_METRIC`: token, latency, `cost_estimate_usd`, ratio; `GET /api/telemetry/session`        |
+| **Frontend**           | `ChatPanel.tsx`, `AILoadingState.tsx`, `AgentActivityPanel.tsx`, `VinWondersMapEmbed.tsx`, `chat-api.ts`                 | Loading state, trace agent, map trong câu trả lời, streaming                                  |
+| **Lab 3 deliverables** | `main.py`, `scripts/eval_lab3.py`, `tests/test_vinwonders_scoring.py`, `report/group_report/GROUP_REPORT_C2-Team-040.md` | So sánh chatbot/agent; eval offline; group report                                             |
+
 
 ### Commit tiêu biểu trên `nguyenBranch`
 
@@ -119,12 +121,14 @@ Với **agent**, `Thought` buộc model **lập kế hoạch** trước mỗi `A
 
 ### 2. Reliability — khi Agent **kém hơn** Chatbot
 
-| Tình huống | Chatbot | Agent |
-| :--- | :--- | :--- |
-| Câu chào / FAQ chung | Nhanh, đủ dùng | Chậm hơn (nhiều round-trip) |
-| Mạng/API lỗi | Vẫn có thể trả lời chung chung | Dễ fail hoặc message kỹ thuật |
-| Câu off-topic | Đôi khi vẫn trả lời lan man | v2 từ chối có chủ đích (Karphany) |
-| Câu cần **giá + thời tiết thật** | Hay **bịa** VND (log bước 4 cũ từng Final Answer trước đủ tool) | Đúng hơn nếu pipeline chạy đủ |
+
+| Tình huống                       | Chatbot                                                         | Agent                             |
+| -------------------------------- | --------------------------------------------------------------- | --------------------------------- |
+| Câu chào / FAQ chung             | Nhanh, đủ dùng                                                  | Chậm hơn (nhiều round-trip)       |
+| Mạng/API lỗi                     | Vẫn có thể trả lời chung chung                                  | Dễ fail hoặc message kỹ thuật     |
+| Câu off-topic                    | Đôi khi vẫn trả lời lan man                                     | v2 từ chối có chủ đích (Karphany) |
+| Câu cần **giá + thời tiết thật** | Hay **bịa** VND (log bước 4 cũ từng Final Answer trước đủ tool) | Đúng hơn nếu pipeline chạy đủ     |
+
 
 Kết luận cá nhân: Agent chỉ “thắng” khi có **tool ổn định + guardrails**; không thì chatbot đôi khi **nghe có vẻ hợp lý hơn** nhưng sai sự thật.
 
@@ -154,22 +158,3 @@ Frontend quan sát được qua tab **Agent hoạt động** (`agent_step` SSE) 
 - **LangGraph** cho nhánh: đã có giá → gợi ý combo; mưa → nhánh indoor; multi-destination trip.
 - Map: nhiều marker trên một iframe hoặc Mapbox thay OSM embed đơn giản.
 
----
-
-## Phụ lục — Lệnh demo cá nhân (nguyenBranch)
-
-```bash
-# Chatbot baseline
-python chatbot.py "Nha Trang cuối tuần sau giá bao nhiêu?"
-
-# Agent v1 vs v2
-python run_agent.py "Nha Trang cuối tuần sau" --version v1
-python run_agent.py "Nha Trang cuối tuần sau" --version v2
-
-# Web + eval
-python -m src.vinwonders.server
-python scripts/eval_lab3.py --offline
-python -m pytest tests/test_vinwonders_scoring.py -q
-```
-
-**Tài liệu liên quan:** [GROUP_REPORT_C2-Team-040.md](../group_report/GROUP_REPORT_C2-Team-040.md) · [TOOL_DESIGN_EVOLUTION.md](../TOOL_DESIGN_EVOLUTION.md) · [SCORING.md](../../SCORING.md)
