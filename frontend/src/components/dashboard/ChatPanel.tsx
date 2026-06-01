@@ -10,7 +10,7 @@ import {
   Loader2,
 } from "lucide-react";
 import {
-  checkApiHealth,
+  getApiHealth,
   sendChatMessage,
   type ChatMessage,
 } from "@/lib/api/chat";
@@ -38,10 +38,14 @@ export function ChatPanel({ onSend }: { onSend?: (msg: string) => void }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
+  const [apiProvider, setApiProvider] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    checkApiHealth().then(setApiOnline);
+    getApiHealth().then((h) => {
+      setApiOnline(h.ok);
+      setApiProvider(h.provider ?? null);
+    });
   }, []);
 
   const handleSend = useCallback(
@@ -74,7 +78,7 @@ export function ChatPanel({ onSend }: { onSend?: (msg: string) => void }) {
           raw.includes("insufficient_quota") ||
           raw.includes("RESOURCE_EXHAUSTED");
         const msg = isQuota
-          ? "API key đã hết quota. Kiểm tra billing OpenAI/Gemini hoặc đổi DEFAULT_PROVIDER trong .env sang provider còn quota."
+          ? `API hết quota (provider: ${apiProvider ?? "unknown"}). Đang dùng DeepSeek? Kiểm tra DEFAULT_PROVIDER=deepseek trong .env và restart backend.`
           : raw;
         setError(msg);
         setMessages((prev) => [
@@ -82,9 +86,7 @@ export function ChatPanel({ onSend }: { onSend?: (msg: string) => void }) {
           {
             id: newId(),
             role: "assistant",
-            content: isQuota
-              ? `${msg}\n\nGợi ý:\n1. Mở .env → đổi DEFAULT_PROVIDER=google (hoặc openai)\n2. Restart backend: py api_server.py\n3. Kiểm tra billing tại platform.openai.com hoặc aistudio.google.com`
-              : `Xin lỗi, tôi không thể trả lời lúc này.\n\n${msg}\n\nHãy chắc backend đang chạy: py api_server.py`,
+            content: `Xin lỗi, không thể trả lời.\n\n${msg}`,
           },
         ]);
       } finally {
@@ -119,7 +121,7 @@ export function ChatPanel({ onSend }: { onSend?: (msg: string) => void }) {
               />
               {apiOnline === false
                 ? "Offline · Chạy py api_server.py"
-                : "AI Concierge · Trực tuyến"}
+                : `AI Concierge · ${apiProvider ?? "deepseek"}`}
             </p>
           </div>
         </div>

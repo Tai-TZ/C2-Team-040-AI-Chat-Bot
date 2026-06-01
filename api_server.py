@@ -15,11 +15,11 @@ from pydantic import BaseModel, Field
 
 from src.agent.agent import ReActAgent
 from src.chatbot.chatbot import Chatbot
-from src.core.provider_factory import create_provider
+from src.core.provider_factory import create_provider, reload_env
 from src.telemetry.logger import logger
 from src.tools import get_tool_definitions
 
-load_dotenv()
+load_dotenv(override=True)
 
 app = FastAPI(title="C2 Team 040 AI Chat Bot API", version="1.0.0")
 
@@ -47,27 +47,44 @@ class ChatResponse(BaseModel):
     reply: str
     reasoning_steps: list[str] = []
     mode: str
+    provider: str = ""
 
 
 @app.get("/api/health")
 def health():
-    provider = os.getenv("DEFAULT_PROVIDER", "openai")
-    return {"status": "ok", "provider": provider}
+    reload_env()
+    return {
+        "status": "ok",
+        "provider": os.getenv("DEFAULT_PROVIDER", "deepseek"),
+        "model": os.getenv("DEFAULT_MODEL", "deepseek-v4-flash"),
+    }
 
 
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
+    reload_env()
     message = req.message.strip()
     if not message:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
+    provider_name = req.provider or os.getenv("DEFAULT_PROVIDER", "deepseek")
+
     try:
         llm = create_provider(req.provider)
+        logger.log_event(
+            "API_CHAT",
+            {"provider": provider_name, "model": llm.model_name, "mode": req.mode},
+        )
 
         if req.mode == "chatbot":
             bot = Chatbot(llm)
             reply = bot.run(message)
-            return ChatResponse(reply=reply, reasoning_steps=[], mode="chatbot")
+            return ChatResponse(
+                reply=reply,
+                reasoning_steps=[],
+                mode="chatbot",
+                provider=provider_name,
+            )
 
         agent = ReActAgent(llm, get_tool_definitions(), max_steps=6, prompt_version="v2")
         reply = agent.run(message)
@@ -75,15 +92,20 @@ def chat(req: ChatRequest):
             reply=reply,
             reasoning_steps=agent.get_reasoning_steps(),
             mode="agent",
+            provider=provider_name,
         )
 
     except Exception as e:
-        logger.log_event("API_ERROR", {"error": str(e), "message": message[:200]})
+        logger.log_event(
+            "API_ERROR",
+            {"error": str(e), "message": message[:200], "provider": provider_name},
+        )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 if __name__ == "__main__":
     import uvicorn
 
+    reload_env()
     port = int(os.getenv("API_PORT", "8000"))
     uvicorn.run("api_server:app", host="0.0.0.0", port=port, reload=True)

@@ -98,18 +98,18 @@ def main():
 
     p_chat = sub.add_parser("chatbot", help="Run chatbot baseline")
     p_chat.add_argument("query", nargs="?", default="Hello!")
-    p_chat.add_argument("--provider", choices=["openai", "google", "local"])
+    p_chat.add_argument("--provider", choices=["deepseek", "openai", "google", "local"])
 
     p_agent = sub.add_parser("agent", help="Run ReAct agent")
     p_agent.add_argument("query", nargs="?", default="Check iPhone stock.")
-    p_agent.add_argument("--provider", choices=["openai", "google", "local"])
+    p_agent.add_argument("--provider", choices=["deepseek", "openai", "google", "local"])
     p_agent.add_argument("--version", choices=["v1", "v2"], default="v2")
 
     p_cmp = sub.add_parser("compare", help="Compare chatbot vs agent on multi-step query")
-    p_cmp.add_argument("--provider", choices=["openai", "google", "local"])
+    p_cmp.add_argument("--provider", choices=["deepseek", "openai", "google", "local"])
 
     p_test = sub.add_parser("test", help="Run full test suite")
-    p_test.add_argument("--provider", choices=["openai", "google", "local"])
+    p_test.add_argument("--provider", choices=["deepseek", "openai", "google", "local"])
 
     args = parser.parse_args()
 

@@ -11,6 +11,13 @@ export interface ChatApiResponse {
   reply: string;
   reasoning_steps: string[];
   mode: ChatMode;
+  provider?: string;
+}
+
+export interface ApiHealth {
+  ok: boolean;
+  provider?: string;
+  model?: string;
 }
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
@@ -22,7 +29,7 @@ export async function sendChatMessage(
   const res = await fetch(`${API_BASE}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, mode }),
+    body: JSON.stringify({ message, mode, provider: "deepseek" }),
   });
 
   if (!res.ok) {
@@ -34,11 +41,19 @@ export async function sendChatMessage(
   return res.json() as Promise<ChatApiResponse>;
 }
 
-export async function checkApiHealth(): Promise<boolean> {
+export async function getApiHealth(): Promise<ApiHealth> {
   try {
     const res = await fetch(`${API_BASE}/api/health`);
-    return res.ok;
+    if (!res.ok) return { ok: false };
+    const data = (await res.json()) as { provider?: string; model?: string };
+    return { ok: true, provider: data.provider, model: data.model };
   } catch {
-    return false;
+    return { ok: false };
   }
+}
+
+/** @deprecated use getApiHealth */
+export async function checkApiHealth(): Promise<boolean> {
+  const h = await getApiHealth();
+  return h.ok;
 }
