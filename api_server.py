@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from src.agent.agent import ReActAgent
 from src.chatbot.chatbot import Chatbot
+from src.core.api_errors import exception_to_http
 from src.core.provider_factory import create_provider, reload_env
 from src.telemetry.logger import logger
 from src.tools import get_tool_definitions
@@ -95,12 +96,21 @@ def chat(req: ChatRequest):
             provider=provider_name,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
+        status, detail = exception_to_http(e)
         logger.log_event(
             "API_ERROR",
-            {"error": str(e), "message": message[:200], "provider": provider_name},
+            {
+                "error": str(e),
+                "code": detail["code"],
+                "status": status,
+                "message": message[:200],
+                "provider": provider_name,
+            },
         )
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=status, detail=detail) from e
 
 
 if __name__ == "__main__":

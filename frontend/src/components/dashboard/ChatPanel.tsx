@@ -10,6 +10,7 @@ import {
   Loader2,
 } from "lucide-react";
 import {
+  formatChatApiError,
   getApiHealth,
   sendChatMessage,
   type ChatMessage,
@@ -71,15 +72,7 @@ export function ChatPanel({ onSend }: { onSend?: (msg: string) => void }) {
         };
         setMessages((prev) => [...prev, assistantMsg]);
       } catch (e) {
-        const raw = e instanceof Error ? e.message : "Lỗi không xác định";
-        const isQuota =
-          raw.includes("429") ||
-          raw.includes("quota") ||
-          raw.includes("insufficient_quota") ||
-          raw.includes("RESOURCE_EXHAUSTED");
-        const msg = isQuota
-          ? `API hết quota (provider: ${apiProvider ?? "unknown"}). Đang dùng DeepSeek? Kiểm tra DEFAULT_PROVIDER=deepseek trong .env và restart backend.`
-          : raw;
+        const msg = formatChatApiError(e);
         setError(msg);
         setMessages((prev) => [
           ...prev,
