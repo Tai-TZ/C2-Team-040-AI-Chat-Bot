@@ -164,6 +164,13 @@ def chat_stream(req: ChatRequest):
                                 "data": event.get("data"),
                             }
                         )
+                    elif event.get("type") == "dashboard":
+                        yield _sse_payload(
+                            {
+                                "type": "dashboard",
+                                "data": event.get("data"),
+                            }
+                        )
                     elif event.get("type") == "content":
                         yield _sse_payload(
                             {

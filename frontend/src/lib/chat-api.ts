@@ -1,4 +1,8 @@
 import type { ChatMessage, ChatStructured } from "./chat-types";
+import type { AgentProgress } from "@/components/dashboard/AILoadingState";
+import type { DashboardContext } from "./dashboard-context";
+
+export type TraceEvent = AgentProgress;
 
 const API_BASE = import.meta.env.VITE_VINWONDERS_API ?? "";
 
@@ -11,8 +15,9 @@ function toApiMessages(messages: ChatMessage[]): ApiChatMessage[] {
 export async function streamChat(
   messages: ChatMessage[],
   onDelta: (text: string) => void,
-  onTrace?: (message: string) => void,
+  onTrace?: (trace: TraceEvent) => void,
   onStructured?: (data: ChatStructured) => void,
+  onDashboard?: (data: DashboardContext) => void,
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/api/chat/stream`, {
     method: "POST",
@@ -53,15 +58,25 @@ export async function streamChat(
         const chunk = JSON.parse(data) as {
           type?: string;
           message?: string;
-          data?: ChatStructured;
+          lines?: string[];
+          progress?: number;
+          data?: ChatStructured | DashboardContext;
           choices?: { delta?: { content?: string } }[];
         };
         if (chunk.type === "structured" && chunk.data) {
-          onStructured?.(chunk.data);
+          onStructured?.(chunk.data as ChatStructured);
+          continue;
+        }
+        if (chunk.type === "dashboard" && chunk.data) {
+          onDashboard?.(chunk.data as DashboardContext);
           continue;
         }
         if (chunk.type === "trace" && chunk.message) {
-          onTrace?.(chunk.message);
+          onTrace?.({
+            status: chunk.message,
+            lines: chunk.lines ?? [chunk.message],
+            progress: chunk.progress ?? 10,
+          });
           continue;
         }
         if (chunk.type === "error" && chunk.message) {

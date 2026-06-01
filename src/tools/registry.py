@@ -8,6 +8,7 @@ from typing import Any, Callable
 from src.tools.dates import parse_visit_date
 from src.tools.destinations import list_destinations, resolve_site
 from src.tools.prices import get_ticket_prices_tool
+from src.tools.weather import get_weather_forecast
 
 VINWONDERS_TOOLS: list[dict[str, Any]] = [
     {
@@ -35,6 +36,15 @@ VINWONDERS_TOOLS: list[dict[str, Any]] = [
         "parameters": {"expression": "string"},
     },
     {
+        "name": "get_weather_forecast",
+        "description": (
+            "Kiểm tra thời tiết dự báo tại địa điểm vào ngày đi (BẮT BUỘC trước khi tư vấn vé). "
+            'Tham số: location="Nha Trang", using_date="21-06-2026". '
+            "Nếu hasRain=true, hỏi khách có muốn dời ngày hoặc gợi ý hoạt động trong nhà."
+        ),
+        "parameters": {"location": "string", "using_date": "string"},
+    },
+    {
         "name": "get_ticket_prices",
         "description": (
             "Lấy giá vé VinWonders thật theo mã địa điểm và ngày. "
@@ -49,6 +59,7 @@ _HANDLERS: dict[str, Callable[..., str]] = {
     "list_destinations": list_destinations,
     "resolve_site": resolve_site,
     "parse_visit_date": parse_visit_date,
+    "get_weather_forecast": get_weather_forecast,
     "get_ticket_prices": get_ticket_prices_tool,
 }
 

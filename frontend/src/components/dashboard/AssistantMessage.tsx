@@ -1,7 +1,9 @@
 import { ExternalLink, Sparkles, Ticket } from "lucide-react";
 import { renderChatText } from "@/lib/format-chat-text";
 import type { ChatAction, ChatMessage, PriceQuote } from "@/lib/chat-types";
+import type { WeatherInfo } from "@/lib/dashboard-context";
 import { dispatchOpenTicketsTab } from "@/lib/vinwonders-events";
+import { WeatherCard } from "./WeatherCard";
 
 type Props = {
   message: ChatMessage;
@@ -119,6 +121,7 @@ function ActionButtons({
 
 export function AssistantMessage({ message, onAction }: Props) {
   const quote = message.structured?.priceQuote;
+  const weather = message.structured?.weather as WeatherInfo | undefined;
   const actions = message.structured?.actions ?? [];
 
   const handleAction = (action: ChatAction) => {
@@ -134,6 +137,12 @@ export function AssistantMessage({ message, onAction }: Props) {
 
   return (
     <div className="space-y-1">
+      {weather && (
+        <div className="mb-2">
+          <WeatherCard weather={weather} compact />
+        </div>
+      )}
+
       {quote && (
         <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           <Sparkles className="h-3 w-3 text-primary" />

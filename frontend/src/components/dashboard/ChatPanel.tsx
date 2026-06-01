@@ -8,9 +8,14 @@ import {
   Calendar,
   Loader2,
 } from "lucide-react";
+import {
+  AILoadingState,
+  type AgentProgress,
+} from "@/components/dashboard/AILoadingState";
 import { AssistantMessage } from "@/components/dashboard/AssistantMessage";
 import { streamChat } from "@/lib/chat-api";
 import type { ChatAction, ChatMessage } from "@/lib/chat-types";
+import { dispatchDashboardContext } from "@/lib/dashboard-context";
 
 const quickActions = [
   { label: "Lên kế hoạch cuối tuần", icon: Calendar },
@@ -33,7 +38,9 @@ export function ChatPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
+  const [agentProgress, setAgentProgress] = useState<AgentProgress | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -43,7 +50,7 @@ export function ChatPanel() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, loading, scrollToBottom]);
+  }, [messages, loading, agentProgress, scrollToBottom]);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -61,7 +68,11 @@ export function ChatPanel() {
       setMessages([...messages.filter((m) => m.id !== "welcome"), userMsg]);
       setInput("");
       setLoading(true);
-      setStatus("Agent đang xử lý...");
+      setAgentProgress({
+        status: "Đang khởi động agent...",
+        lines: ["Nhận câu hỏi của bạn...", "Khởi tạo VinWonders Tour Guide Agent..."],
+        progress: 8,
+      });
       setError(null);
 
       setMessages((prev) => [
@@ -73,7 +84,7 @@ export function ChatPanel() {
         await streamChat(
           history,
           (delta) => {
-            setStatus(null);
+            setAgentProgress(null);
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === assistantId
@@ -82,13 +93,16 @@ export function ChatPanel() {
               ),
             );
           },
-          (trace) => setStatus(trace),
+          (trace) => setAgentProgress(trace),
           (structured) => {
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === assistantId ? { ...m, structured } : m,
               ),
             );
+          },
+          (dashboard) => {
+            dispatchDashboardContext(dashboard);
           },
         );
       } catch (e) {
@@ -97,7 +111,7 @@ export function ChatPanel() {
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));
       } finally {
         setLoading(false);
-        setStatus(null);
+        setAgentProgress(null);
       }
     },
     [loading, messages],
@@ -107,6 +121,7 @@ export function ChatPanel() {
     setMessages([WELCOME]);
     setError(null);
     setInput("");
+    dispatchDashboardContext({ focus: "idle" });
   }
 
   function handleMessageAction(action: ChatAction) {
@@ -156,16 +171,18 @@ export function ChatPanel() {
               </div>
             )}
             <div
-              className={`max-w-[85%] text-sm leading-relaxed ${
+              className={`text-sm leading-relaxed ${
                 m.role === "user"
-                  ? "rounded-2xl rounded-br-md bg-gradient-primary px-4 py-3 text-primary-foreground shadow-soft"
-                  : "rounded-2xl rounded-tl-md border border-border bg-card px-4 py-3 text-card-foreground shadow-soft"
+                  ? "max-w-[85%] rounded-2xl rounded-br-md bg-gradient-primary px-4 py-3 text-primary-foreground shadow-soft"
+                  : "max-w-[min(100%,28rem)] rounded-2xl rounded-tl-md border border-border bg-card px-4 py-3 text-card-foreground shadow-soft"
               }`}
             >
-              {m.role === "assistant" && !m.content && loading ? (
+              {m.role === "assistant" && !m.content && loading && agentProgress ? (
+                <AILoadingState progress={agentProgress} />
+              ) : m.role === "assistant" && !m.content && loading ? (
                 <span className="inline-flex items-center gap-2 text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {status ?? "Agent đang tra cứu..."}
+                  Agent đang kết nối...
                 </span>
               ) : m.role === "assistant" ? (
                 <AssistantMessage

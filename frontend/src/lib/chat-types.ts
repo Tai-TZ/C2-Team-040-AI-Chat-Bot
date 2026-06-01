@@ -32,8 +32,25 @@ export type ChatAction =
       usingDate?: string;
     };
 
+export type WeatherCardInfo = {
+  location: string;
+  usingDate: string;
+  tempC?: number | null;
+  feelsLikeC?: number | null;
+  description?: string;
+  icon?: string;
+  humidity?: number;
+  windMs?: number;
+  popPercent?: number;
+  hasRain?: boolean;
+  rainRisk?: string;
+  recommendation?: string;
+  suggestReschedule?: boolean;
+};
+
 export type ChatStructured = {
   priceQuote?: PriceQuote;
+  weather?: WeatherCardInfo;
   actions?: ChatAction[];
 };
 
