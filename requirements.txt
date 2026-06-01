@@ -7,4 +7,4 @@ cloudscraper>=1.2.71
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 pytest>=7.4.0
-#llama-cpp-python>=0.2.0
+# llama-cpp-python>=0.2.0
