@@ -76,16 +76,88 @@ class ReActAgent:
             return f"✓ Giá rẻ nhất: {cheapest} ({data.get('ticketCount', 0)} loại vé)"
         return f"✓ Hoàn tất: {label}"
 
-    def _trace_event(self, message: str) -> dict[str, Any]:
+    @staticmethod
+    def _summarize_for_ui(text: str, max_len: int = 110) -> str:
+        line = re.sub(r"\s+", " ", text.strip())
+        if len(line) <= max_len:
+            return line
+        return line[: max_len - 1] + "…"
+
+    def _tool_action_detail(self, tool: str, args: dict[str, Any]) -> str:
+        label = _TOOL_LABELS.get(tool, tool)
+        if tool == "resolve_site":
+            q = args.get("query") or args.get("location") or ""
+            return f"Xác định địa điểm: {q}" if q else label
+        if tool == "parse_visit_date":
+            d = args.get("date_text") or args.get("date") or ""
+            return f"Phân tích ngày: {d}" if d else label
+        if tool == "get_weather_forecast":
+            loc = args.get("location") or ""
+            d = args.get("using_date") or args.get("usingDate") or ""
+            if loc and d:
+                return f"Kiểm tra thời tiết {loc} · {d}"
+            return f"Kiểm tra thời tiết {loc}" if loc else label
+        if tool == "get_ticket_prices":
+            code = args.get("supplier_code") or args.get("supplierCode") or ""
+            d = args.get("using_date") or args.get("usingDate") or ""
+            if code and d:
+                return f"Tra giá vé {code} · {d}"
+            return label
+        return label
+
+    def _reasoning_from_parsed(self, parsed: dict[str, Any]) -> tuple[str, list[str]]:
+        """Map model Thought/Action to user-facing loading lines."""
+        lines: list[str] = []
+        thought = (parsed.get("thought") or "").strip()
+        if thought:
+            lines.append(f"💭 {self._summarize_for_ui(thought)}")
+
+        status = "Đang phân tích bước tiếp theo..."
+        if parsed["type"] == "action":
+            tool = parsed["tool"]
+            args = parsed.get("args") or {}
+            detail = self._tool_action_detail(tool, args)
+            lines.append(f"→ {detail}")
+            status = detail
+        elif parsed["type"] == "final":
+            status = "Đang soạn câu trả lời..."
+        elif parsed["type"] == "unparsed":
+            status = "Đang điều chỉnh phản hồi từ model..."
+        return status, lines
+
+    def _compute_progress(self) -> int:
+        tools_done = [t.get("tool") for t in self.trace if t.get("tool")]
+        if any(t.get("final") for t in self.trace):
+            return 95
+        if "get_ticket_prices" in tools_done:
+            return 82
+        if "get_weather_forecast" in tools_done:
+            return 62
+        if "parse_visit_date" in tools_done:
+            return 45
+        if "resolve_site" in tools_done:
+            return 28
+        return min(10 + len(self._progress_lines) * 4, 24)
+
+    def _trace_event(
+        self, message: str, *, phase: str | None = None
+    ) -> dict[str, Any]:
         step_count = len(self.trace)
-        progress = min(12 + step_count * 14, 92)
-        return {
+        progress = self._compute_progress()
+        if phase == "reasoning":
+            progress = max(progress, min(18 + step_count * 8, 40))
+        elif phase == "tool":
+            progress = max(progress, min(35 + step_count * 12, 85))
+        evt: dict[str, Any] = {
             "type": "trace",
             "message": message,
             "lines": list(self._progress_lines),
             "progress": progress,
             "step": step_count + 1,
         }
+        if phase:
+            evt["phase"] = phase
+        return evt
 
     def get_system_prompt(self) -> str:
         tool_descriptions = "\n".join(
@@ -237,6 +309,7 @@ class ReActAgent:
         """Yield trace events then final content for SSE streaming."""
         self.trace = []
         self._progress_lines = ["Khởi tạo VinWonders Tour Guide Agent..."]
+        yield self._trace_event("Đã nhận câu hỏi — khởi động agent...", phase="init")
         if conversation_context:
             user_input = f"{conversation_context.strip()}\n\nCâu hỏi mới nhất: {user_input}"
 
@@ -246,17 +319,21 @@ class ReActAgent:
         for step_idx in range(self.max_steps):
             prompt = self._build_prompt(user_input, steps)
             think_msg = f"Đang suy luận (bước {step_idx + 1})..."
-            self._append_progress(think_msg)
-            yield self._trace_event(think_msg)
+            yield self._trace_event(think_msg, phase="reasoning")
 
             result = self.llm.generate(prompt, system_prompt=system_prompt)
             content = (result.get("content") or "").strip()
             parsed = self._parse_response(content)
 
+            reason_status, reason_lines = self._reasoning_from_parsed(parsed)
+            for line in reason_lines:
+                self._append_progress(line)
+            yield self._trace_event(reason_status, phase="reasoning")
+
             if parsed["type"] == "final":
                 done_msg = "Đang tổng hợp câu trả lời cho bạn..."
                 self._append_progress(done_msg)
-                yield self._trace_event(done_msg)
+                yield self._trace_event(done_msg, phase="summarize")
                 structured = build_chat_structured(self.trace)
                 if structured:
                     yield {"type": "structured", "data": structured}
@@ -275,25 +352,14 @@ class ReActAgent:
             if parsed["type"] == "action":
                 tool = parsed["tool"]
                 args = parsed.get("args") or {}
-                trace_msg = {
-                    "get_weather_forecast": "Đang kiểm tra thời tiết tại điểm đến...",
-                    "get_ticket_prices": "Đang crawl giá vé VinWonders (API)...",
-                    "resolve_site": "Đang xác định mã địa điểm...",
-                    "parse_visit_date": "Đang phân tích ngày đi...",
-                    "list_destinations": "Đang tải danh sách điểm đến...",
-                }.get(tool, f"Đang chạy tool {tool}...")
-                self._append_progress(trace_msg)
-                yield self._trace_event(trace_msg)
+                trace_msg = self._tool_action_detail(tool, args)
+                self._append_progress(f"⚙ {trace_msg}")
+                yield self._trace_event(trace_msg, phase="tool")
                 observation = self._execute_tool(tool, args)
-                self._append_progress(self._line_for_tool_done(tool, observation))
-                done_status = {
-                    "get_weather_forecast": "Đã kiểm tra thời tiết",
-                    "get_ticket_prices": "Đã lấy giá vé",
-                    "resolve_site": "Đã xác định địa điểm",
-                    "parse_visit_date": "Đã xác định ngày đi",
-                    "list_destinations": "Đã tải danh sách điểm đến",
-                }.get(tool, f"Đã hoàn tất {tool}")
-                yield self._trace_event(done_status)
+                done_line = self._line_for_tool_done(tool, observation)
+                self._append_progress(done_line)
+                done_status = done_line.replace("✓ ", "", 1)
+                yield self._trace_event(done_status, phase="tool")
                 steps.append(
                     {
                         "thought": parsed.get("thought", ""),

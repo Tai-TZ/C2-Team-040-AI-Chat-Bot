@@ -9,6 +9,8 @@ export type AgentProgress = {
   status: string;
   lines: string[];
   progress: number;
+  step?: number;
+  phase?: "reasoning" | "tool" | "summarize" | "init";
 };
 
 function LoadingAnimation({ progress }: { progress: number }) {

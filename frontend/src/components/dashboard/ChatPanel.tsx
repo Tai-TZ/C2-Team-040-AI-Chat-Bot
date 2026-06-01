@@ -70,12 +70,10 @@ export function ChatPanel() {
       setInput("");
       setLoading(true);
       setAgentProgress({
-        status: "Đang khởi động agent...",
-        lines: [
-          "Nhận câu hỏi của bạn...",
-          "Khởi tạo VinWonders Tour Guide Agent...",
-        ],
-        progress: 8,
+        status: "Đang kết nối agent...",
+        lines: [],
+        progress: 5,
+        phase: "init",
       });
       setError(null);
 

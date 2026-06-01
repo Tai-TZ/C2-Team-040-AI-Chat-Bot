@@ -60,6 +60,8 @@ export async function streamChat(
           message?: string;
           lines?: string[];
           progress?: number;
+          step?: number;
+          phase?: string;
           data?: ChatStructured | DashboardContext;
           choices?: { delta?: { content?: string } }[];
         };
@@ -72,10 +74,16 @@ export async function streamChat(
           continue;
         }
         if (chunk.type === "trace" && chunk.message) {
+          const lines =
+            chunk.lines && chunk.lines.length > 0
+              ? chunk.lines
+              : [chunk.message];
           onTrace?.({
             status: chunk.message,
-            lines: chunk.lines ?? [chunk.message],
+            lines,
             progress: chunk.progress ?? 10,
+            step: chunk.step,
+            phase: chunk.phase as AgentProgress["phase"],
           });
           continue;
         }

@@ -155,6 +155,10 @@ def chat_stream(req: ChatRequest):
                             {
                                 "type": "trace",
                                 "message": event.get("message", ""),
+                                "lines": event.get("lines", []),
+                                "progress": event.get("progress", 10),
+                                "step": event.get("step"),
+                                "phase": event.get("phase"),
                             }
                         )
                     elif event.get("type") == "structured":
