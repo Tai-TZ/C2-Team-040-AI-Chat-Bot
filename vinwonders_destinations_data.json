@@ -1,0 +1,131 @@
+{
+    "destinations": [
+      {
+        "destination_code": "NHA_TRANG",
+        "destination_name": "Nha Trang",
+        "sub_locations": [
+          {
+            "code": "NTVW1",
+            "name": "VinWonders Nha Trang",
+            "tag": "Theme Park"
+          },
+          {
+            "code": "VPHB1",
+            "name": "Vinpearl Harbour",
+            "tag": "Shopping & Entertainment"
+          },
+          {
+            "code": "AQF01",
+            "name": "Aquafield Nha Trang",
+            "tag": "Sauna & Spa"
+          },
+          {
+            "code": "HTVW1",
+            "name": "Tắm Bùn Hòn Tằm",
+            "tag": "Wellness"
+          }
+        ]
+      },
+      {
+        "destination_code": "PHU_QUOC",
+        "destination_name": "Phú Quốc",
+        "sub_locations": [
+          {
+            "code": "PQVW1",
+            "name": "VinWonders Phú Quốc",
+            "tag": "Theme Park"
+          },
+          {
+            "code": "PQSAF",
+            "name": "Vinpearl Safari Phú Quốc",
+            "tag": "Wildlife Park"
+          },
+          {
+            "code": "PQGW1",
+            "name": "Grand World Phú Quốc",
+            "tag": "Sleepless City"
+          },
+          {
+            "code": "HVSST",
+            "name": "THE HAVEN SUNSET TOUR",
+            "tag": "Experience Tour"
+          }
+        ]
+      },
+      {
+        "destination_code": "HA_NOI",
+        "destination_name": "Hà Nội",
+        "sub_locations": [
+          {
+            "code": "GWHN1",
+            "name": "Grand World",
+            "tag": "Shopping & Entertainment"
+          },
+          {
+            "code": "HNVKA",
+            "name": "VinKE & Vinpearl Aquarium",
+            "tag": "Edu-play & Aquarium"
+          },
+          {
+            "code": "AQF02",
+            "name": "Aquafield Ocean City (Sauna & Spa)",
+            "tag": "Sauna & Spa"
+          },
+          {
+            "code": "HNVW2",
+            "name": "VinWonders Wave Park & Water Park",
+            "tag": "Water Park"
+          }
+        ]
+      },
+      {
+        "destination_code": "NGHE_AN_HA_TINH",
+        "destination_name": "Nghệ An - Hà Tĩnh",
+        "sub_locations": [
+          {
+            "code": "CVNHT",
+            "name": "Công Viên Nước Hà Tĩnh",
+            "tag": "Water Park"
+          },
+          {
+            "code": "CHVW1",
+            "name": "VinWonders Cửa Hội",
+            "tag": "Theme Park"
+          }
+        ]
+      },
+      {
+        "destination_code": "DA_NANG_HOI_AN",
+        "destination_name": "Đà Nẵng - Hội An",
+        "sub_locations": [
+          {
+            "code": "NHAVW",
+            "name": "VinWonders Nam Hội An",
+            "tag": "Theme Park"
+          }
+        ]
+      },
+      {
+        "destination_code": "HAI_PHONG",
+        "destination_name": "Hải Phòng",
+        "sub_locations": [
+          {
+            "code": "VYVW1",
+            "name": "VinWonders Vũ Yên",
+            "tag": "Theme Park"
+          }
+        ]
+      },
+      {
+        "destination_code": "HO_CHI_MINH",
+        "destination_name": "Thành Phố Hồ Chí Minh",
+        "sub_locations": [
+          {
+            "code": "GPVW1",
+            "name": "Công viên Grand Park",
+            "tag": "Urban Park"
+          }
+        ]
+      }
+    ]
+  }

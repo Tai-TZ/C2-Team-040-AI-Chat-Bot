@@ -53,4 +53,42 @@ The code is designed as a **Production Prototype**. It includes:
 
 ---
 
+## VinWonders web app (giá vé + chat AI)
+
+### 1. Cấu hình môi trường
+
+```bash
+cp .env.example .env
+```
+
+Chỉnh `.env`:
+
+```env
+DS2API_BASE_URL=https://deep-seek-api-kappa.vercel.app
+DS2API_API_KEY=<api-key-cua-ban>
+DS2API_MODEL=deepseek-v4-flash
+```
+
+DS2API gateway (OpenAI-compatible), ví dụ deploy tại [deep-seek-api-kappa.vercel.app](https://deep-seek-api-kappa.vercel.app/).
+
+### 2. Chạy backend + frontend
+
+**Terminal 1 — API Python (proxy giá vé + chat):**
+```bash
+pip install -r requirements.txt
+python -m src.vinwonders.server
+```
+
+**Terminal 2 — Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+- **Chat trái**: hỏi AI qua DS2API (`POST /api/chat/stream` → `/v1/chat/completions`).
+- **Tab Vé & Chuyến bay**: chọn khu vực / địa điểm / ngày → **Xem giá vé** (dữ liệu từ `vinwonders_destinations_data.json` + API VinWonders).
+
+---
+
 *Happy Coding! Let's build agents that actually work.*

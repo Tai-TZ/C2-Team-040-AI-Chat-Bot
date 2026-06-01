@@ -14,7 +14,7 @@ const tabs = [
 type TabId = (typeof tabs)[number]["id"];
 
 export function Canvas() {
-  const [tab, setTab] = useState<TabId>("itinerary");
+  const [tab, setTab] = useState<TabId>("tickets");
 
   return (
     <div className="flex h-full flex-col bg-gradient-to-br from-background via-background to-accent/30">
