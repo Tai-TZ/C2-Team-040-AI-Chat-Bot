@@ -1,0 +1,28 @@
+{
+  "title": "Successful trace — Nha Trang cuối tuần sau (Agent v2 + bootstrap)",
+  "status": "success",
+  "user_input": "Mình muốn đi Nha Trang cuối tuần sau, check thời tiết và giá vé",
+  "agent_version": "v2",
+  "trace_summary": [
+    {
+      "tool": "resolve_site",
+      "observation_preview": "VinWonders Nha Trang → NTVW1, 4 attractions"
+    },
+    {
+      "tool": "parse_visit_date",
+      "observation_preview": "usingDate DD-MM-YYYY from «cuối tuần sau»"
+    },
+    {
+      "tool": "get_weather_forecast",
+      "observation_preview": "tempC, hasRain, recommendation"
+    },
+    {
+      "tool": "get_ticket_prices",
+      "observation_preview": "cheapestFormatted from live API"
+    }
+  ],
+  "ui_events": ["agent_step", "structured", "dashboard", "content stream"],
+  "structured_output_keys": ["weather", "priceQuote", "destinationMap", "actions"],
+  "log_events": ["AGENT_START", "TOOL_CALL", "TOOL_RESULT", "LLM_METRIC", "AGENT_END"],
+  "notes": "Bootstrap runs before LLM loop; guardrails prevent Final Answer until pipeline_complete."
+}

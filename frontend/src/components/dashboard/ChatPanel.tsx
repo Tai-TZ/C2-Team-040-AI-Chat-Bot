@@ -1,20 +1,24 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Sparkles,
   Send,
-  ChevronDown,
   User,
   Plane,
   Ticket,
   Calendar,
   Loader2,
 } from "lucide-react";
+import { AILoadingState } from "@/components/dashboard/AILoadingState";
+import { useScriptedAgentLoading } from "@/hooks/useScriptedAgentLoading";
+import { AssistantMessage } from "@/components/dashboard/AssistantMessage";
+import { formatChatApiError } from "@/lib/api/chat";
+import { streamChat } from "@/lib/chat-api";
+import type { ChatAction, ChatMessage } from "@/lib/chat-types";
 import {
-  formatChatApiError,
-  getApiHealth,
-  sendChatMessage,
-  type ChatMessage,
-} from "@/lib/api/chat";
+  dispatchAgentActivity,
+  IDLE_AGENT_RUN,
+} from "@/lib/agent-activity";
+import { dispatchDashboardContext } from "@/lib/dashboard-context";
 
 const quickActions = [
   { label: "Lên kế hoạch cuối tuần", icon: Calendar },
@@ -22,78 +26,133 @@ const quickActions = [
   { label: "Săn vé máy bay", icon: Plane },
 ];
 
+function newId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 const WELCOME: ChatMessage = {
   id: "welcome",
   role: "assistant",
   content:
-    "Xin chào! Tôi là AI Concierge VinWonders. Hỏi tôi về lịch trình, vé, giá cả hoặc gợi ý chuyến đi Phú Quốc nhé.",
+    "Xin chào! Mình là Karphany — AI Concierge VinWonders. Hỏi địa điểm và ngày đi (vd: Nha Trang cuối tuần sau), mình sẽ check thời tiết, giá vé thật và hiển thị bên phải cho bạn nhé.",
 };
 
-function newId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-export function ChatPanel({ onSend }: { onSend?: (msg: string) => void }) {
+export function ChatPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
-  const [openReasoning, setOpenReasoning] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [apiOnline, setApiOnline] = useState<boolean | null>(null);
-  const [apiProvider, setApiProvider] = useState<string | null>(null);
+  const [loadingQuery, setLoadingQuery] = useState("");
+  const scriptedProgress = useScriptedAgentLoading(loading, loadingQuery);
   const [error, setError] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    getApiHealth().then((h) => {
-      setApiOnline(h.ok);
-      setApiProvider(h.provider ?? null);
-    });
+  const scrollToBottom = useCallback(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  const handleSend = useCallback(
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading, scriptedProgress, scrollToBottom]);
+
+  const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || loading) return;
 
-      onSend?.(trimmed);
-      setError(null);
+      const userMsg: ChatMessage = {
+        id: newId(),
+        role: "user",
+        content: trimmed,
+      };
+      const history = [...messages.filter((m) => m.id !== "welcome"), userMsg];
+      const assistantId = newId();
 
-      const userMsg: ChatMessage = { id: newId(), role: "user", content: trimmed };
-      setMessages((prev) => [...prev, userMsg]);
+      setMessages([...messages.filter((m) => m.id !== "welcome"), userMsg]);
       setInput("");
       setLoading(true);
+      setLoadingQuery(trimmed);
+      dispatchAgentActivity({ ...IDLE_AGENT_RUN, active: true, steps: [] });
+      setError(null);
 
+      setMessages((prev) => [
+        ...prev,
+        { id: assistantId, role: "assistant", content: "" },
+      ]);
+
+      let hadReply = false;
       try {
-        const data = await sendChatMessage(trimmed, "agent");
-        const assistantMsg: ChatMessage = {
-          id: newId(),
-          role: "assistant",
-          content: data.reply,
-          reasoningSteps: data.reasoning_steps.length > 0 ? data.reasoning_steps : undefined,
-        };
-        setMessages((prev) => [...prev, assistantMsg]);
+        await streamChat(history, {
+          onDelta: (delta) => {
+            hadReply = true;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId
+                  ? { ...m, content: m.content + delta }
+                  : m,
+              ),
+            );
+          },
+          onStructured: (structured) => {
+            hadReply = true;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId
+                  ? {
+                      ...m,
+                      structured: {
+                        ...m.structured,
+                        ...structured,
+                        actions:
+                          structured.actions?.length
+                            ? structured.actions
+                            : m.structured?.actions,
+                      },
+                    }
+                  : m,
+              ),
+            );
+          },
+          onDashboard: dispatchDashboardContext,
+          onAgentActivity: dispatchAgentActivity,
+          onAgentDone: (agentRun) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, agentRun } : m,
+              ),
+            );
+          },
+        });
       } catch (e) {
         const msg = formatChatApiError(e);
-        setError(msg);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: newId(),
-            role: "assistant",
-            content: `Xin lỗi, không thể trả lời.\n\n${msg}`,
-          },
-        ]);
+        if (hadReply) {
+          setError(
+            `${msg} (Đã hiển thị kết quả tra cứu; bạn vẫn có thể xem giá và thời tiết bên dưới.)`,
+          );
+        } else {
+          setError(msg);
+          setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        }
       } finally {
         setLoading(false);
+        setLoadingQuery("");
       }
     },
-    [loading, onSend],
+    [loading, messages],
   );
 
-  const resetChat = () => {
+  function handleNewChat() {
     setMessages([WELCOME]);
-    setOpenReasoning(null);
     setError(null);
-  };
+    setInput("");
+    dispatchDashboardContext({ focus: "idle" });
+    dispatchAgentActivity(IDLE_AGENT_RUN);
+  }
+
+  function handleMessageAction(action: ChatAction) {
+    if (action.kind === "message") {
+      sendMessage(action.text);
+    }
+  }
 
   return (
     <div className="flex h-full flex-col bg-surface">
@@ -108,18 +167,18 @@ export function ChatPanel({ onSend }: { onSend?: (msg: string) => void }) {
             </h1>
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  apiOnline === false ? "bg-destructive" : "bg-success animate-pulse"
-                }`}
+                className={`h-1.5 w-1.5 rounded-full ${loading ? "bg-amber-400 animate-pulse" : "bg-success animate-pulse"}`}
               />
-              {apiOnline === false
-                ? "Offline · Chạy py api_server.py"
-                : `AI Concierge · ${apiProvider ?? "deepseek"}`}
+              AI Concierge ·{" "}
+              {loading
+                ? scriptedProgress?.status ?? "Đang kết nối agent..."
+                : "Trực tuyến"}
             </p>
           </div>
         </div>
         <button
-          onClick={resetChat}
+          type="button"
+          onClick={handleNewChat}
           disabled={loading}
           className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
         >
@@ -127,86 +186,66 @@ export function ChatPanel({ onSend }: { onSend?: (msg: string) => void }) {
         </button>
       </header>
 
-      <div className="flex-1 space-y-6 overflow-y-auto scrollbar-thin px-5 py-6">
-        {messages.map((msg) =>
-          msg.role === "user" ? (
-            <div key={msg.id} className="flex justify-end animate-fade-in-up">
-              <div className="flex max-w-[85%] items-end gap-2">
-                <div className="rounded-2xl rounded-br-md bg-gradient-primary px-4 py-3 text-sm text-primary-foreground shadow-soft whitespace-pre-wrap">
-                  {msg.content}
-                </div>
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
-                  <User className="h-4 w-4" />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div key={msg.id} className="flex animate-fade-in-up gap-2">
+      <div className="flex-1 space-y-4 overflow-y-auto scrollbar-thin px-5 py-6">
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            className={`flex animate-fade-in-up ${m.role === "user" ? "justify-end" : "gap-2"}`}
+          >
+            {m.role === "assistant" && (
               <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-primary text-primary-foreground shadow-soft">
                 <Sparkles className="h-4 w-4" />
               </div>
-              <div className="flex-1 space-y-3 min-w-0">
-                {msg.reasoningSteps && msg.reasoningSteps.length > 0 && (
-                  <>
-                    <button
-                      onClick={() =>
-                        setOpenReasoning((v) => (v === msg.id ? null : msg.id))
-                      }
-                      className="group inline-flex items-center gap-2 rounded-full border border-border bg-muted/60 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all hover:bg-muted"
-                    >
-                      <Loader2 className="h-3 w-3 text-primary" />
-                      <span>Agent reasoning · {msg.reasoningSteps.length} bước</span>
-                      <ChevronDown
-                        className={`h-3 w-3 transition-transform ${openReasoning === msg.id ? "rotate-180" : ""}`}
-                      />
-                    </button>
-                    {openReasoning === msg.id && (
-                      <div className="animate-scale-in rounded-2xl border border-border bg-muted/40 p-3">
-                        <ol className="space-y-2">
-                          {msg.reasoningSteps.map((step, i) => (
-                            <li
-                              key={i}
-                              className="flex items-start gap-2.5 text-xs text-muted-foreground"
-                            >
-                              <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary">
-                                {i + 1}
-                              </span>
-                              <span>{step}</span>
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-                    )}
-                  </>
-                )}
-                <div className="rounded-2xl rounded-tl-md bg-card border border-border px-4 py-3 text-sm leading-relaxed text-card-foreground shadow-soft whitespace-pre-wrap">
-                  {msg.content}
-                </div>
-              </div>
+            )}
+            <div
+              className={`text-sm leading-relaxed ${
+                m.role === "user"
+                  ? "max-w-[85%] rounded-2xl rounded-br-md bg-gradient-primary px-4 py-3 text-primary-foreground shadow-soft"
+                  : "max-w-[min(100%,28rem)] rounded-2xl rounded-tl-md border border-border bg-card px-4 py-3 text-card-foreground shadow-soft"
+              }`}
+            >
+              {m.role === "assistant" && !m.content && loading && scriptedProgress ? (
+                <AILoadingState progress={scriptedProgress} />
+              ) : m.role === "assistant" ? (
+                <AssistantMessage
+                  message={m}
+                  onAction={handleMessageAction}
+                />
+              ) : (
+                <p className="whitespace-pre-wrap">{m.content}</p>
+              )}
             </div>
-          ),
-        )}
-
-        {loading && (
-          <div className="flex gap-2 items-center text-xs text-muted-foreground animate-pulse px-2">
-            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            AI đang suy nghĩ...
+            {m.role === "user" && (
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
+                <User className="h-4 w-4" />
+              </div>
+            )}
           </div>
-        )}
+        ))}
+        <div ref={bottomRef} />
       </div>
 
-      <div className="border-t border-border bg-surface-elevated/60 backdrop-blur px-5 py-4">
-        {error && (
-          <p className="mb-2 text-xs text-destructive">{error}</p>
-        )}
+      {error && (
+        <div className="mx-5 mb-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          {error}
+          <p className="mt-1 text-muted-foreground">
+            Kiểm tra backend{" "}
+            <code className="rounded bg-muted px-1">python -m src.vinwonders.server</code>{" "}
+            và <code className="rounded bg-muted px-1">DS2API_API_KEY</code> trong file{" "}
+            <code className="rounded bg-muted px-1">.env</code>.
+          </p>
+        </div>
+      )}
+
+      <div className="border-t border-border bg-surface-elevated/60 px-5 py-4 backdrop-blur">
         <div className="mb-3 flex flex-wrap gap-2">
           {quickActions.map((a) => (
             <button
               key={a.label}
               type="button"
               disabled={loading}
-              onClick={() => handleSend(a.label)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-all hover:border-primary hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+              onClick={() => sendMessage(a.label)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-all hover:border-primary hover:bg-accent disabled:opacity-50"
             >
               <a.icon className="h-3.5 w-3.5" />
               {a.label}
@@ -216,22 +255,22 @@ export function ChatPanel({ onSend }: { onSend?: (msg: string) => void }) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            handleSend(input);
+            sendMessage(input);
           }}
-          className="flex items-center gap-2 rounded-2xl border border-border bg-background p-2 shadow-soft focus-within:border-primary focus-within:shadow-glow transition-all"
+          className="flex items-center gap-2 rounded-2xl border border-border bg-background p-2 shadow-soft transition-all focus-within:border-primary focus-within:shadow-glow"
         >
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={loading}
             placeholder="Hỏi gì đó về chuyến đi của bạn..."
-            className="flex-1 bg-transparent px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
+            className="flex-1 bg-transparent px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none disabled:opacity-60"
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-primary text-primary-foreground transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-            aria-label="Send"
+            className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-primary text-primary-foreground transition-transform hover:scale-105 active:scale-95 disabled:opacity-50"
+            aria-label="Gửi"
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />

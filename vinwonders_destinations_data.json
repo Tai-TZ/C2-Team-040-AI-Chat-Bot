@@ -1,0 +1,200 @@
+{
+  "destinations": [
+    {
+      "destination_code": "NHA_TRANG",
+      "destination_name": "Nha Trang",
+      "map": {
+        "center": { "lat": 12.2388, "lng": 109.1967 },
+        "zoom": 12,
+        "bbox": [109.12, 12.14, 109.32, 12.32]
+      },
+      "sub_locations": [
+        {
+          "code": "NTVW1",
+          "name": "VinWonders Nha Trang",
+          "tag": "Theme Park",
+          "lat": 12.2165,
+          "lng": 109.2384
+        },
+        {
+          "code": "VPHB1",
+          "name": "Vinpearl Harbour",
+          "tag": "Shopping & Entertainment",
+          "lat": 12.2465,
+          "lng": 109.2285
+        },
+        {
+          "code": "AQF01",
+          "name": "Aquafield Nha Trang",
+          "tag": "Sauna & Spa",
+          "lat": 12.265,
+          "lng": 109.22
+        },
+        {
+          "code": "HTVW1",
+          "name": "Tắm Bùn Hòn Tằm",
+          "tag": "Wellness",
+          "lat": 12.1833,
+          "lng": 109.2833
+        }
+      ]
+    },
+    {
+      "destination_code": "PHU_QUOC",
+      "destination_name": "Phú Quốc",
+      "map": {
+        "center": { "lat": 10.2899, "lng": 103.984 },
+        "zoom": 11,
+        "bbox": [103.92, 10.32, 104.05, 10.42]
+      },
+      "sub_locations": [
+        {
+          "code": "PQVW1",
+          "name": "VinWonders Phú Quốc",
+          "tag": "Theme Park",
+          "lat": 10.3833,
+          "lng": 103.9847
+        },
+        {
+          "code": "PQSAF",
+          "name": "Vinpearl Safari Phú Quốc",
+          "tag": "Wildlife Park",
+          "lat": 10.3839,
+          "lng": 103.9659
+        },
+        {
+          "code": "PQGW1",
+          "name": "Grand World Phú Quốc",
+          "tag": "Sleepless City",
+          "lat": 10.3644,
+          "lng": 103.9896
+        },
+        {
+          "code": "HVSST",
+          "name": "THE HAVEN SUNSET TOUR",
+          "tag": "Experience Tour",
+          "lat": 10.352,
+          "lng": 103.978
+        }
+      ]
+    },
+    {
+      "destination_code": "HA_NOI",
+      "destination_name": "Hà Nội",
+      "map": {
+        "center": { "lat": 21.0278, "lng": 105.8342 },
+        "zoom": 11,
+        "bbox": [105.78, 20.96, 105.95, 21.06]
+      },
+      "sub_locations": [
+        {
+          "code": "GWHN1",
+          "name": "Grand World",
+          "tag": "Shopping & Entertainment",
+          "lat": 20.9963,
+          "lng": 105.9057
+        },
+        {
+          "code": "HNVKA",
+          "name": "VinKE & Vinpearl Aquarium",
+          "tag": "Edu-play & Aquarium",
+          "lat": 21.0089,
+          "lng": 105.9089
+        },
+        {
+          "code": "AQF02",
+          "name": "Aquafield Ocean City (Sauna & Spa)",
+          "tag": "Sauna & Spa",
+          "lat": 20.9975,
+          "lng": 105.9065
+        },
+        {
+          "code": "HNVW2",
+          "name": "VinWonders Wave Park & Water Park",
+          "tag": "Water Park",
+          "lat": 20.9965,
+          "lng": 105.907
+        }
+      ]
+    },
+    {
+      "destination_code": "NGHE_AN_HA_TINH",
+      "destination_name": "Nghệ An - Hà Tĩnh",
+      "map": {
+        "center": { "lat": 18.6796, "lng": 105.6813 },
+        "zoom": 10,
+        "bbox": [105.55, 18.3, 106.05, 18.95]
+      },
+      "sub_locations": [
+        {
+          "code": "CVNHT",
+          "name": "Công Viên Nước Hà Tĩnh",
+          "tag": "Water Park",
+          "lat": 18.3559,
+          "lng": 105.8877
+        },
+        {
+          "code": "CHVW1",
+          "name": "VinWonders Cửa Hội",
+          "tag": "Theme Park",
+          "lat": 17.45,
+          "lng": 106.35
+        }
+      ]
+    },
+    {
+      "destination_code": "DA_NANG_HOI_AN",
+      "destination_name": "Đà Nẵng - Hội An",
+      "map": {
+        "center": { "lat": 15.88, "lng": 108.338 },
+        "zoom": 11,
+        "bbox": [108.25, 15.75, 108.45, 15.98]
+      },
+      "sub_locations": [
+        {
+          "code": "NHAVW",
+          "name": "VinWonders Nam Hội An",
+          "tag": "Theme Park",
+          "lat": 15.8801,
+          "lng": 108.338
+        }
+      ]
+    },
+    {
+      "destination_code": "HAI_PHONG",
+      "destination_name": "Hải Phòng",
+      "map": {
+        "center": { "lat": 20.8449, "lng": 106.6881 },
+        "zoom": 11,
+        "bbox": [106.55, 20.72, 106.85, 20.95]
+      },
+      "sub_locations": [
+        {
+          "code": "VYVW1",
+          "name": "VinWonders Vũ Yên",
+          "tag": "Theme Park",
+          "lat": 20.78,
+          "lng": 106.72
+        }
+      ]
+    },
+    {
+      "destination_code": "HO_CHI_MINH",
+      "destination_name": "Thành Phố Hồ Chí Minh",
+      "map": {
+        "center": { "lat": 10.8231, "lng": 106.6297 },
+        "zoom": 12,
+        "bbox": [106.58, 10.78, 106.68, 10.87]
+      },
+      "sub_locations": [
+        {
+          "code": "GPVW1",
+          "name": "Công viên Grand Park",
+          "tag": "Urban Park",
+          "lat": 10.8412,
+          "lng": 106.8305
+        }
+      ]
+    }
+  ]
+}

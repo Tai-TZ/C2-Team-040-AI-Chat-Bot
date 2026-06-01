@@ -1,4 +1,3 @@
-import heroImg from "@/assets/vinwonders-hero.jpg";
 import tataImg from "@/assets/tata-show.jpg";
 import fountainImg from "@/assets/fountain-show.jpg";
 import safariImg from "@/assets/safari.jpg";
@@ -47,27 +46,6 @@ export const flights = [
     duration: "2h 10m",
     stops: "Bay thẳng",
     price: 1740000,
-  },
-];
-
-export const tickets = [
-  {
-    id: "vw-combo",
-    title: "VinWonders + Safari Combo 2 ngày",
-    subtitle: "Vé vào cổng không giới hạn · Buffet trưa",
-    price: 1150000,
-    original: 1450000,
-    badge: "Giảm 20%",
-    image: heroImg,
-  },
-  {
-    id: "tata",
-    title: "Tata Show · Hạng VIP",
-    subtitle: "Ghế trung tâm · Welcome drink",
-    price: 850000,
-    original: 1050000,
-    badge: "Hot",
-    image: tataImg,
   },
 ];
 

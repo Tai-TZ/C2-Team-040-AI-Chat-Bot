@@ -5,7 +5,11 @@ __pycache__/
 .DS_Store
 models/
 .venv/
+.venv.local/
+env/
 node_modules/
+run_output.txt
+frontend/.vite/
 
 # Frontend UI
 frontend/node_modules/
