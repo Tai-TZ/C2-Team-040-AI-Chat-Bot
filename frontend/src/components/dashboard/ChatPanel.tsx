@@ -13,6 +13,7 @@ import {
   type AgentProgress,
 } from "@/components/dashboard/AILoadingState";
 import { AssistantMessage } from "@/components/dashboard/AssistantMessage";
+import { formatChatApiError } from "@/lib/api/chat";
 import { streamChat } from "@/lib/chat-api";
 import type { ChatAction, ChatMessage } from "@/lib/chat-types";
 import { dispatchDashboardContext } from "@/lib/dashboard-context";
@@ -70,7 +71,10 @@ export function ChatPanel() {
       setLoading(true);
       setAgentProgress({
         status: "Đang khởi động agent...",
-        lines: ["Nhận câu hỏi của bạn...", "Khởi tạo VinWonders Tour Guide Agent..."],
+        lines: [
+          "Nhận câu hỏi của bạn...",
+          "Khởi tạo VinWonders Tour Guide Agent...",
+        ],
         progress: 8,
       });
       setError(null);
@@ -106,7 +110,7 @@ export function ChatPanel() {
           },
         );
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Lỗi kết nối AI";
+        const msg = formatChatApiError(e);
         setError(msg);
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));
       } finally {
