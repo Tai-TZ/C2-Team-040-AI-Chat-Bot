@@ -1,8 +1,10 @@
-import { ExternalLink, Sparkles, Ticket } from "lucide-react";
+import { ExternalLink, MessageCircle, Sparkles, Ticket } from "lucide-react";
+import { getAssistantActions } from "@/lib/chat-actions";
+import { MessageAgentTrace } from "./MessageAgentTrace";
 import { renderChatText } from "@/lib/format-chat-text";
 import type { ChatAction, ChatMessage, PriceQuote } from "@/lib/chat-types";
-import type { WeatherInfo } from "@/lib/dashboard-context";
 import { dispatchOpenTicketsTab } from "@/lib/vinwonders-events";
+import { VinWondersMapEmbed } from "./VinWondersMapEmbed";
 import { WeatherCard } from "./WeatherCard";
 
 type Props = {
@@ -81,7 +83,12 @@ function ActionButtons({
   onAction: (action: ChatAction) => void;
 }) {
   return (
-    <div className="mt-3 flex flex-wrap gap-2 border-t border-border/60 pt-3">
+    <div className="mt-4 border-t border-border/60 pt-3">
+      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+        <MessageCircle className="h-3.5 w-3.5 text-primary" />
+        Bạn muốn làm gì tiếp theo?
+      </p>
+      <div className="flex flex-wrap gap-2">
       {actions.map((action) => {
         if (action.kind === "link") {
           return (
@@ -115,14 +122,17 @@ function ActionButtons({
           </button>
         );
       })}
+      </div>
     </div>
   );
 }
 
 export function AssistantMessage({ message, onAction }: Props) {
   const quote = message.structured?.priceQuote;
-  const weather = message.structured?.weather as WeatherInfo | undefined;
-  const actions = message.structured?.actions ?? [];
+  const weather = message.structured?.weather;
+  const destinationMap = message.structured?.destinationMap;
+  const actions = getAssistantActions(message);
+  const showActions = actions.length > 0 && Boolean(message.content.trim());
 
   const handleAction = (action: ChatAction) => {
     if (action.kind === "tab") {
@@ -158,7 +168,18 @@ export function AssistantMessage({ message, onAction }: Props) {
         </div>
       ) : null}
 
-      {actions.length > 0 && (
+      {destinationMap && (
+        <VinWondersMapEmbed map={destinationMap} compact />
+      )}
+
+      {message.agentRun && (
+        <MessageAgentTrace
+          steps={message.agentRun.steps}
+          toolCount={message.agentRun.toolCount}
+        />
+      )}
+
+      {showActions && (
         <ActionButtons actions={actions} onAction={handleAction} />
       )}
     </div>

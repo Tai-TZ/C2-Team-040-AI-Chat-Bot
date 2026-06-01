@@ -1,3 +1,6 @@
+import type { AgentStepRecord } from "@/lib/agent-activity";
+import type { WeatherInfo } from "@/lib/dashboard-context";
+
 export type ChatRole = "user" | "assistant";
 
 export type TicketCard = {
@@ -32,26 +35,38 @@ export type ChatAction =
       usingDate?: string;
     };
 
-export type WeatherCardInfo = {
-  location: string;
-  usingDate: string;
-  tempC?: number | null;
-  feelsLikeC?: number | null;
-  description?: string;
-  icon?: string;
-  humidity?: number;
-  windMs?: number;
-  popPercent?: number;
-  hasRain?: boolean;
-  rainRisk?: string;
-  recommendation?: string;
-  suggestReschedule?: boolean;
+export type MapMarker = {
+  code: string;
+  name: string;
+  tag: string;
+  lat: number;
+  lng: number;
 };
+
+export type DestinationMap = {
+  region: string;
+  destinationCode: string;
+  center: { lat: number; lng: number };
+  zoom: number;
+  bbox: number[];
+  embedUrl: string;
+  markers: MapMarker[];
+  subLocationCount: number;
+};
+
+export type WeatherCardInfo = WeatherInfo;
 
 export type ChatStructured = {
   priceQuote?: PriceQuote;
-  weather?: WeatherCardInfo;
+  weather?: WeatherInfo;
+  destinationMap?: DestinationMap;
   actions?: ChatAction[];
+};
+
+export type AgentRunMeta = {
+  steps: AgentStepRecord[];
+  toolCount: number;
+  reactSteps: number;
 };
 
 export type ChatMessage = {
@@ -59,4 +74,5 @@ export type ChatMessage = {
   role: ChatRole;
   content: string;
   structured?: ChatStructured;
+  agentRun?: AgentRunMeta;
 };

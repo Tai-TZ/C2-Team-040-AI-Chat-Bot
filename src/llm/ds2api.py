@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Generator, Iterable
+import time
+from typing import Any, Generator
 
 import requests
 from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import HTTPError
 
 DEFAULT_BASE_URL = "https://deep-seek-api-kappa.vercel.app"
 DEFAULT_MODEL = "deepseek-v4-flash"
+_RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+_MAX_RETRIES = 3
 
 
 def _base_url() -> str:
@@ -59,11 +63,29 @@ def chat_completion(
 
     try:
         if not stream:
-            resp = requests.post(
-                url, headers=_headers(), json=payload, timeout=timeout
-            )
-            resp.raise_for_status()
-            return json.loads(resp.content.decode("utf-8"))
+            last_exc: Exception | None = None
+            for attempt in range(_MAX_RETRIES):
+                resp = requests.post(
+                    url, headers=_headers(), json=payload, timeout=timeout
+                )
+                if resp.status_code in _RETRYABLE_STATUS and attempt < _MAX_RETRIES - 1:
+                    time.sleep(1.5 * (attempt + 1))
+                    continue
+                try:
+                    resp.raise_for_status()
+                except HTTPError as exc:
+                    last_exc = exc
+                    if (
+                        resp.status_code in _RETRYABLE_STATUS
+                        and attempt < _MAX_RETRIES - 1
+                    ):
+                        time.sleep(1.5 * (attempt + 1))
+                        continue
+                    raise _friendly_http_error(exc, resp) from exc
+                return json.loads(resp.content.decode("utf-8"))
+            if last_exc:
+                raise last_exc
+            raise RuntimeError("DS2API request failed without response")
 
         resp = requests.post(
             url, headers=_headers(), json=payload, stream=True, timeout=timeout
@@ -72,6 +94,8 @@ def chat_completion(
         resp.encoding = "utf-8"
     except RequestsConnectionError as exc:
         raise ConnectionError(_connection_hint(exc)) from exc
+    except HTTPError as exc:
+        raise _friendly_http_error(exc, exc.response) from exc
 
     def _iter_lines() -> Generator[str, None, None]:
         # Decode bytes as UTF-8 — requests defaults SSE to ISO-8859-1 (breaks Vietnamese).
@@ -80,6 +104,27 @@ def chat_completion(
                 yield line.decode("utf-8")
 
     return _iter_lines()
+
+
+def _friendly_http_error(exc: HTTPError, resp: requests.Response | None) -> RuntimeError:
+    status = resp.status_code if resp is not None else 0
+    body_preview = ""
+    if resp is not None:
+        try:
+            body_preview = resp.text[:200]
+        except Exception:
+            body_preview = ""
+    if status in _RETRYABLE_STATUS:
+        return RuntimeError(
+            f"DS2API tạm lỗi (HTTP {status}). Đã thử lại {_MAX_RETRIES} lần. "
+            "Thử lại sau vài giây hoặc kiểm tra DS2API_API_KEY / DS2API_BASE_URL."
+            + (f" Chi tiết: {body_preview}" if body_preview else "")
+        )
+    if status in (401, 403):
+        return RuntimeError(
+            f"DS2API từ chối API key (HTTP {status}). Kiểm tra DS2API_API_KEY trong .env."
+        )
+    return RuntimeError(str(exc))
 
 
 def check_health() -> dict[str, Any]:

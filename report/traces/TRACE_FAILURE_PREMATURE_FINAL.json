@@ -1,0 +1,16 @@
+{
+  "title": "Failed trace — Premature Final Answer (Agent v1, no guardrails)",
+  "status": "failure_recovered",
+  "user_input": "Nha Trang cuối tuần sau giá vé bao nhiêu?",
+  "agent_version": "v1",
+  "failure_mode": "premature_final_answer",
+  "step_1_model_output": "Thought: Đã biết Nha Trang.\nFinal Answer: Vé khoảng 800.000đ, thời tiết đẹp.",
+  "root_cause": "Model skipped get_weather_forecast and get_ticket_prices; invented price.",
+  "v2_fix": [
+    "guardrails.reject_premature_final() injects Observation forcing missing tools",
+    "bootstrap auto-runs pipeline before LLM",
+    "registry._sanitize_tool_args reduces tool argument errors"
+  ],
+  "telemetry_reference": "logs/YYYY-MM-DD.log — search AGENT_PARSE_ERROR, TOOL_RESULT with error",
+  "expected_v2_observation": "CHƯA ĐƯỢC PHÉP Final Answer. Còn thiếu tool: get_weather_forecast, get_ticket_prices"
+}

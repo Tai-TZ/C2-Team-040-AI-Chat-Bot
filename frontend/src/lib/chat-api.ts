@@ -1,12 +1,18 @@
-import type { ChatMessage, ChatStructured } from "./chat-types";
-import type { AgentProgress } from "@/components/dashboard/AILoadingState";
+import type { AgentRunState, AgentStepRecord } from "@/lib/agent-activity";
+import type { ChatMessage, AgentRunMeta, ChatStructured } from "./chat-types";
 import type { DashboardContext } from "./dashboard-context";
-
-export type TraceEvent = AgentProgress;
 
 const API_BASE = import.meta.env.VITE_VINWONDERS_API ?? "";
 
 type ApiChatMessage = { role: "user" | "assistant" | "system"; content: string };
+
+export type StreamChatCallbacks = {
+  onDelta: (text: string) => void;
+  onStructured?: (data: ChatStructured) => void;
+  onDashboard?: (data: DashboardContext) => void;
+  onAgentActivity?: (state: AgentRunState) => void;
+  onAgentDone?: (run: AgentRunMeta) => void;
+};
 
 function toApiMessages(messages: ChatMessage[]): ApiChatMessage[] {
   return messages.map((m) => ({ role: m.role, content: m.content }));
@@ -14,10 +20,7 @@ function toApiMessages(messages: ChatMessage[]): ApiChatMessage[] {
 
 export async function streamChat(
   messages: ChatMessage[],
-  onDelta: (text: string) => void,
-  onTrace?: (trace: TraceEvent) => void,
-  onStructured?: (data: ChatStructured) => void,
-  onDashboard?: (data: DashboardContext) => void,
+  callbacks: StreamChatCallbacks,
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/api/chat/stream`, {
     method: "POST",
@@ -39,6 +42,18 @@ export async function streamChat(
   const reader = res.body.getReader();
   const decoder = new TextDecoder("utf-8");
   let buffer = "";
+  let gotContent = false;
+  const activitySteps: AgentStepRecord[] = [];
+  let toolCount = 0;
+
+  const pushActivity = () => {
+    callbacks.onAgentActivity?.({
+      active: true,
+      steps: [...activitySteps],
+      toolCount,
+      reactSteps: activitySteps.filter((s) => s.phase === "tool").length,
+    });
+  };
 
   while (true) {
     const { done, value } = await reader.read();
@@ -58,40 +73,64 @@ export async function streamChat(
         const chunk = JSON.parse(data) as {
           type?: string;
           message?: string;
-          lines?: string[];
-          progress?: number;
-          step?: number;
-          phase?: string;
           data?: ChatStructured | DashboardContext;
+          run?: AgentRunMeta;
           choices?: { delta?: { content?: string } }[];
+          step?: AgentStepRecord;
         };
-        if (chunk.type === "structured" && chunk.data) {
-          onStructured?.(chunk.data as ChatStructured);
+
+        if (chunk.type === "agent_step" && chunk.step) {
+          const rec = chunk.step;
+          const idx = activitySteps.findIndex((s) => s.id === rec.id);
+          if (idx >= 0) {
+            activitySteps[idx] = rec;
+          } else {
+            activitySteps.push(rec);
+          }
+          if (rec.phase === "tool" && rec.status === "done") {
+            toolCount = activitySteps.filter(
+              (s) =>
+                s.phase === "tool" &&
+                s.status === "done" &&
+                s.title.startsWith("Observation"),
+            ).length;
+          }
+          pushActivity();
           continue;
         }
-        if (chunk.type === "dashboard" && chunk.data) {
-          onDashboard?.(chunk.data as DashboardContext);
-          continue;
-        }
-        if (chunk.type === "trace" && chunk.message) {
-          const lines =
-            chunk.lines && chunk.lines.length > 0
-              ? chunk.lines
-              : [chunk.message];
-          onTrace?.({
-            status: chunk.message,
-            lines,
-            progress: chunk.progress ?? 10,
-            step: chunk.step,
-            phase: chunk.phase as AgentProgress["phase"],
+
+        if (chunk.type === "agent_done" && chunk.run) {
+          callbacks.onAgentDone?.(chunk.run);
+          callbacks.onAgentActivity?.({
+            active: false,
+            steps: chunk.run.steps ?? activitySteps,
+            toolCount: chunk.run.toolCount ?? toolCount,
+            reactSteps: chunk.run.reactSteps ?? 0,
           });
           continue;
         }
+
+        if (chunk.type === "structured" && chunk.data) {
+          gotContent = true;
+          callbacks.onStructured?.(chunk.data as ChatStructured);
+          continue;
+        }
+
+        if (chunk.type === "dashboard" && chunk.data) {
+          callbacks.onDashboard?.(chunk.data as DashboardContext);
+          continue;
+        }
+
         if (chunk.type === "error" && chunk.message) {
+          if (gotContent) return;
           throw new Error(chunk.message);
         }
+
         const delta = chunk.choices?.[0]?.delta?.content;
-        if (delta) onDelta(delta);
+        if (delta) {
+          gotContent = true;
+          callbacks.onDelta(delta);
+        }
       } catch (err) {
         if (err instanceof SyntaxError) continue;
         throw err;

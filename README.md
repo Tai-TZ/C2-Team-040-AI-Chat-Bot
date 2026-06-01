@@ -43,7 +43,17 @@ LOCAL_MODEL_PATH=./models/Phi-3-mini-4k-instruct-q4.gguf
 2.  **ReAct Loop**: Implement the `Thought-Action-Observation` cycle in `src/agent/agent.py`.
 3.  **Provider Switching**: Swap between OpenAI and Gemini seamlessly using the `LLMProvider` interface.
 4.  **Failure Analysis**: Use the structured logs in `logs/` to identify why the agent fails (hallucinations, parsing errors).
-5.  **Grading & Bonus**: Follow the [SCORING.md](file:///Users/tindt/personal/ai-thuc-chien/day03-lab-agent/SCORING.md) to maximize your points and explore bonus metrics.
+5.  **Grading & Bonus**: Follow [SCORING.md](./SCORING.md). Submit [`report/group_report/GROUP_REPORT_C2-Team-040.md`](./report/group_report/GROUP_REPORT_C2-Team-040.md).
+
+### Lab 3 quick commands (VinWonders)
+
+```bash
+python chatbot.py "Nha Trang cuối tuần sau giá bao nhiêu?"   # baseline
+python run_agent.py "Nha Trang cuối tuần sau" --version v2   # ReAct agent
+python main.py compare                                        # chatbot vs v1 vs v2
+python scripts/eval_lab3.py --offline                         # scoring checks
+python -m pytest tests/test_vinwonders_scoring.py -q
+```
 
 ## 🛠️ How to Use This Baseline
 The code is designed as a **Production Prototype**. It includes:

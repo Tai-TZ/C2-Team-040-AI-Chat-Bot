@@ -18,11 +18,12 @@ from src.agent.agent import ReActAgent
 from src.core.factory import get_llm_provider
 from src.llm import ds2api
 from src.tools.registry import VINWONDERS_TOOLS
+from src.telemetry.metrics import tracker
 from src.vinwonders.crawler import get_ticket_prices
+from src.vinwonders.destinations_data import load_destinations
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env", override=True)
-DESTINATIONS_FILE = ROOT / "vinwonders_destinations_data.json"
 
 app = FastAPI(title="VinWonders API", version="1.0.0")
 
@@ -40,12 +41,6 @@ app.add_middleware(
 )
 
 
-def _load_destinations() -> dict:
-    if not DESTINATIONS_FILE.exists():
-        raise HTTPException(500, "vinwonders_destinations_data.json not found")
-    return json.loads(DESTINATIONS_FILE.read_text(encoding="utf-8"))
-
-
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant", "system"]
     content: str = Field(min_length=1)
@@ -58,7 +53,7 @@ class ChatRequest(BaseModel):
 
 @lru_cache(maxsize=1)
 def _get_agent() -> ReActAgent:
-    return ReActAgent(get_llm_provider(), VINWONDERS_TOOLS, max_steps=8)
+    return ReActAgent(get_llm_provider(), VINWONDERS_TOOLS, max_steps=10)
 
 
 def _conversation_context(messages: list[ChatMessage]) -> str | None:
@@ -91,17 +86,26 @@ def _normalize_date(date: str) -> str:
 
 @app.get("/api/health")
 def health():
+    import os
+
+    provider = os.getenv("AGENT_PROVIDER", "openrouter").lower()
     llm_ok = False
     llm_error = None
     try:
-        ds2api.check_health()
-        llm_ok = True
+        if provider in ("ds2api", "deepseek"):
+            ds2api.check_health()
+            llm_ok = True
+        else:
+            llm = get_llm_provider()
+            probe = llm.generate("Reply with exactly: OK", system_prompt=None)
+            llm_ok = bool((probe.get("content") or "").strip())
     except Exception as exc:
         llm_error = str(exc)
 
     return {
         "status": "ok",
-        "ds2api": {"ok": llm_ok, "error": llm_error},
+        "provider": provider,
+        "llm": {"ok": llm_ok, "error": llm_error},
     }
 
 
@@ -175,6 +179,20 @@ def chat_stream(req: ChatRequest):
                                 "data": event.get("data"),
                             }
                         )
+                    elif event.get("type") == "agent_step":
+                        yield _sse_payload(
+                            {
+                                "type": "agent_step",
+                                "step": event.get("step"),
+                            }
+                        )
+                    elif event.get("type") == "agent_done":
+                        yield _sse_payload(
+                            {
+                                "type": "agent_done",
+                                "run": event.get("run"),
+                            }
+                        )
                     elif event.get("type") == "content":
                         yield _sse_payload(
                             {
@@ -207,7 +225,13 @@ def chat_stream(req: ChatRequest):
 
 @app.get("/api/destinations")
 def destinations():
-    return _load_destinations()
+    return load_destinations()
+
+
+@app.get("/api/telemetry/session")
+def telemetry_session():
+    """Session LLM metrics for Lab 3 monitoring (tokens, latency, cost)."""
+    return tracker.session_summary()
 
 
 @app.get("/api/prices")

@@ -9,9 +9,37 @@ from src.core.llm_provider import LLMProvider
 
 
 def get_llm_provider() -> LLMProvider:
-    # Agent web app defaults to DS2API; lab CLI can set AGENT_PROVIDER=openai
-    provider = os.getenv("AGENT_PROVIDER", "ds2api")
+    # Agent web app: AGENT_PROVIDER=openrouter | ds2api | openai | ...
+    provider = os.getenv("AGENT_PROVIDER", "openrouter")
     provider = provider.lower().strip()
+
+    if provider in ("openrouter", "or"):
+        from src.core.openai_provider import OpenAIProvider
+
+        api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+        if not api_key:
+            raise ValueError("OPENROUTER_API_KEY chưa được cấu hình trong .env")
+        model = (
+            os.getenv("AGENT_MODEL")
+            or os.getenv("OPENROUTER_MODEL")
+            or "deepseek/deepseek-chat"
+        )
+        base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+        return OpenAIProvider(
+            model_name=model,
+            api_key=api_key,
+            base_url=base_url,
+            provider_label="openrouter",
+            extra_headers={
+                "HTTP-Referer": os.getenv(
+                    "OPENROUTER_HTTP_REFERER", "http://localhost:8080"
+                ),
+                "X-Title": os.getenv(
+                    "OPENROUTER_APP_TITLE", "VinWonders Tour Guide"
+                ),
+            },
+        )
+
     if provider in ("ds2api", "deepseek"):
         model = (
             os.getenv("AGENT_MODEL")

@@ -1,6 +1,6 @@
 /**
  * AI Loading State — adapted from kokonutui (MIT)
- * Driven by real agent trace lines from the backend.
+ * Shows scripted progress lines (12s per stage) while the agent runs.
  */
 
 import { useEffect, useId, useRef, useState } from "react";

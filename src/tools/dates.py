@@ -7,12 +7,7 @@ import re
 from datetime import datetime, timedelta
 
 
-def _normalize_expr(expression: str) -> str:
-    import unicodedata
-
-    text = expression.lower().strip()
-    text = unicodedata.normalize("NFD", text)
-    return "".join(c for c in text if unicodedata.category(c) != "Mn")
+from src.utils.text import normalize_text
 
 
 def _next_saturday(from_date: datetime, *, weeks_ahead: int = 0) -> datetime:
@@ -42,7 +37,7 @@ def parse_visit_date(expression: str) -> str:
         result = fixed
         note = "exact date"
     else:
-        e = _normalize_expr(expression)
+        e = normalize_text(expression)
         if "ngay mai" in e or "mai" == e:
             result = today + timedelta(days=1)
             note = "tomorrow"

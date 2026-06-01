@@ -10,6 +10,8 @@ from typing import Any
 
 import requests
 
+from src.utils.text import normalize_text
+
 GEO_URL = "https://api.openweathermap.org/geo/1.0/direct"
 FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast"
 
@@ -35,14 +37,6 @@ def _api_key() -> str:
     return key
 
 
-def _normalize(text: str) -> str:
-    import unicodedata
-
-    text = text.lower().strip()
-    text = unicodedata.normalize("NFD", text)
-    return "".join(c for c in text if unicodedata.category(c) != "Mn")
-
-
 def _parse_dd_mm_yyyy(date: str) -> datetime:
     if re.match(r"^\d{2}-\d{2}-\d{4}$", date):
         d, m, y = date.split("-")
@@ -54,7 +48,7 @@ def _parse_dd_mm_yyyy(date: str) -> datetime:
 
 
 def _geocode(location: str) -> tuple[float, float, str]:
-    norm = _normalize(location)
+    norm = normalize_text(location)
     for key, (lat, lon, label) in REGION_COORDS.items():
         if key in norm or norm in key:
             return lat, lon, label

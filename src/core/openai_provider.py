@@ -10,11 +10,14 @@ class OpenAIProvider(LLMProvider):
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         provider_label: str = "openai",
+        extra_headers: Optional[Dict[str, str]] = None,
     ):
         super().__init__(model_name, api_key)
         client_kwargs: Dict[str, Any] = {"api_key": self.api_key}
         if base_url:
             client_kwargs["base_url"] = base_url.rstrip("/")
+        if extra_headers:
+            client_kwargs["default_headers"] = extra_headers
         self.client = OpenAI(**client_kwargs)
         self.provider_label = provider_label
 

@@ -64,12 +64,79 @@ _HANDLERS: dict[str, Callable[..., str]] = {
 }
 
 
+def _is_placeholder(value: Any) -> bool:
+    if value is None:
+        return True
+    s = str(value).strip()
+    if not s:
+        return True
+    if s.startswith("[") and "bước" in s.lower():
+        return True
+    return False
+
+
+def _sanitize_tool_args(tool_name: str, args: dict[str, Any]) -> dict[str, Any]:
+    """Keep only valid params; map common model mistakes to the right keys."""
+    raw = {k: v for k, v in (args or {}).items() if not _is_placeholder(v)}
+
+    if tool_name == "resolve_site":
+        q = raw.get("query") or raw.get("location") or raw.get("region") or raw.get("siteName")
+        return {"query": str(q).strip()} if q else {}
+
+    if tool_name == "parse_visit_date":
+        e = raw.get("expression") or raw.get("date_text") or raw.get("date")
+        return {"expression": str(e).strip()} if e else {}
+
+    if tool_name == "get_weather_forecast":
+        location = raw.get("location") or raw.get("region") or raw.get("siteName")
+        using_date = raw.get("using_date") or raw.get("usingDate")
+        out: dict[str, Any] = {}
+        if location:
+            out["location"] = str(location).strip()
+        if using_date:
+            out["using_date"] = str(using_date).strip()
+        return out
+
+    if tool_name == "get_ticket_prices":
+        code = raw.get("supplier_code") or raw.get("supplierCode")
+        using_date = raw.get("using_date") or raw.get("usingDate")
+        out = {}
+        if code:
+            out["supplier_code"] = str(code).strip().upper()
+        if using_date:
+            out["using_date"] = str(using_date).strip()
+        return out
+
+    if tool_name == "list_destinations":
+        q = raw.get("region_query") or raw.get("region") or raw.get("query")
+        return {"region_query": str(q).strip()} if q else {}
+
+    return raw
+
+
 def execute_tool(tool_name: str, args: dict[str, Any]) -> str:
     handler = _HANDLERS.get(tool_name)
     if not handler:
         return json.dumps({"error": f"Unknown tool: {tool_name}"}, ensure_ascii=False)
+    clean = _sanitize_tool_args(tool_name, args)
+    if tool_name in ("resolve_site", "parse_visit_date", "get_weather_forecast", "get_ticket_prices"):
+        required = {
+            "resolve_site": ("query",),
+            "parse_visit_date": ("expression",),
+            "get_weather_forecast": ("location", "using_date"),
+            "get_ticket_prices": ("supplier_code", "using_date"),
+        }[tool_name]
+        missing = [k for k in required if k not in clean or not str(clean[k]).strip()]
+        if missing:
+            return json.dumps(
+                {
+                    "error": f"Thiếu tham số: {', '.join(missing)}. "
+                    f"Chỉ truyền đúng tham số cho {tool_name}, không thêm field khác.",
+                },
+                ensure_ascii=False,
+            )
     try:
-        return handler(**args)
+        return handler(**clean)
     except TypeError as exc:
         return json.dumps(
             {"error": f"Invalid arguments for {tool_name}: {exc}"},

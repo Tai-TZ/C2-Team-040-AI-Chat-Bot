@@ -1,0 +1,43 @@
+{
+  "mode": "offline",
+  "passed": 6,
+  "total": 6,
+  "results": [
+    {
+      "check": "chatbot_prompt_no_tools",
+      "ok": true
+    },
+    {
+      "check": "bootstrap_location_extract",
+      "ok": true,
+      "value": "Nha Trang"
+    },
+    {
+      "check": "bootstrap_pipeline_tools",
+      "ok": true,
+      "tools": [
+        "resolve_site",
+        "parse_visit_date",
+        "get_weather_forecast",
+        "get_ticket_prices"
+      ]
+    },
+    {
+      "check": "guardrail_premature_final",
+      "ok": true
+    },
+    {
+      "check": "structured_has_map_or_prices",
+      "ok": true,
+      "keys": [
+        "actions",
+        "destinationMap",
+        "priceQuote"
+      ]
+    },
+    {
+      "check": "agent_version_flags",
+      "ok": true
+    }
+  ]
+}

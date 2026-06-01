@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 
+from src.utils.money import format_vnd
 from src.vinwonders.crawler import get_ticket_prices
 
 
@@ -16,10 +17,6 @@ def _normalize_date(date: str) -> str:
         y, m, d = date.split("-")
         return f"{d}-{m}-{y}"
     raise ValueError("using_date must be DD-MM-YYYY or YYYY-MM-DD")
-
-
-def _format_vnd(amount: int) -> str:
-    return f"{amount:,} đ".replace(",", ".")
 
 
 def get_ticket_prices_tool(supplier_code: str, using_date: str) -> str:
@@ -47,7 +44,7 @@ def get_ticket_prices_tool(supplier_code: str, using_date: str) -> str:
         "ticketCount": data.get("ticketCount", 0),
         "tickets": priced[:15],
         "cheapestVnd": cheapest,
-        "cheapestFormatted": _format_vnd(cheapest) if cheapest is not None else None,
+        "cheapestFormatted": format_vnd(cheapest) if cheapest is not None else None,
         "cheapestTicketName": cheapest_row.get("name") if cheapest_row else None,
     }
     return json.dumps(payload, ensure_ascii=False)

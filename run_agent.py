@@ -15,13 +15,24 @@ def main() -> None:
     load_dotenv()
     parser = argparse.ArgumentParser(description="VinWonders ReAct agent CLI")
     parser.add_argument("question", nargs="?", help="User question")
+    parser.add_argument(
+        "--version",
+        choices=["v1", "v2"],
+        default="v2",
+        help="v1=minimal ReAct, v2=bootstrap+guardrails",
+    )
     args = parser.parse_args()
 
     question = args.question or input("Bạn: ").strip()
     if not question:
         return
 
-    agent = ReActAgent(get_llm_provider(), VINWONDERS_TOOLS, max_steps=8)
+    agent = ReActAgent(
+        get_llm_provider(),
+        VINWONDERS_TOOLS,
+        max_steps=10,
+        prompt_version=args.version,
+    )
     print("\n[Agent đang xử lý — có thể mất 30–90s nếu tra giá vé...]\n")
     answer = agent.run(question)
     print("Agent:", answer)

@@ -3,22 +3,10 @@
 from __future__ import annotations
 
 import json
-import unicodedata
-from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[2]
-DESTINATIONS_FILE = ROOT / "vinwonders_destinations_data.json"
-
-
-def _load() -> dict[str, Any]:
-    return json.loads(DESTINATIONS_FILE.read_text(encoding="utf-8"))
-
-
-def _normalize(text: str) -> str:
-    text = text.lower().strip()
-    text = unicodedata.normalize("NFD", text)
-    return "".join(c for c in text if unicodedata.category(c) != "Mn")
+from src.utils.text import normalize_text
+from src.vinwonders.destinations_data import load_destinations
 
 
 def _primary_site(region: dict[str, Any]) -> dict[str, Any]:
@@ -33,15 +21,29 @@ def _primary_site(region: dict[str, Any]) -> dict[str, Any]:
     return sites[0]
 
 
+def _site_score(query: str, region_name: str, site_name: str) -> int:
+    q = normalize_text(query)
+    rn = normalize_text(region_name)
+    sn = normalize_text(site_name)
+    if q == rn or q == sn:
+        return 100
+    if q in rn or rn in q:
+        return 80
+    if q in sn or sn in q:
+        return 70
+    if any(tok in rn for tok in q.split() if len(tok) > 2):
+        return 50
+    return 0
+
+
 def list_destinations(region_query: str = "") -> str:
     """List VinWonders regions and site codes (optional filter)."""
-    data = _load()
-    q = _normalize(region_query) if region_query else ""
+    q = normalize_text(region_query) if region_query else ""
     rows: list[dict[str, str]] = []
 
-    for region in data.get("destinations", []):
+    for region in load_destinations().get("destinations", []):
         name = region.get("destination_name", "")
-        if q and q not in _normalize(name):
+        if q and q not in normalize_text(name):
             continue
         for site in region.get("sub_locations", []):
             rows.append(
@@ -58,28 +60,15 @@ def list_destinations(region_query: str = "") -> str:
 
 def resolve_site(query: str) -> str:
     """Resolve a place name to supplier_code (fuzzy match)."""
-    q = _normalize(query)
-    if not q:
+    if not normalize_text(query):
         return json.dumps({"error": "query is required"}, ensure_ascii=False)
 
-    data = _load()
     best: tuple[int, dict[str, Any], dict[str, Any]] | None = None
 
-    for region in data.get("destinations", []):
+    for region in load_destinations().get("destinations", []):
         region_name = region.get("destination_name", "")
-        rn = _normalize(region_name)
         for site in region.get("sub_locations", []):
-            site_name = site.get("name", "")
-            sn = _normalize(site_name)
-            score = 0
-            if q == rn or q == sn:
-                score = 100
-            elif q in rn or rn in q:
-                score = 80
-            elif q in sn or sn in q:
-                score = 70
-            elif any(tok in rn for tok in q.split() if len(tok) > 2):
-                score = 50
+            score = _site_score(query, region_name, site.get("name", ""))
             if score > 0 and (best is None or score > best[0]):
                 best = (score, region, site)
 
@@ -91,6 +80,14 @@ def resolve_site(query: str) -> str:
 
     _, region, site = best
     primary = _primary_site(region)
+    attractions = [
+        {
+            "code": s.get("code", ""),
+            "name": s.get("name", ""),
+            "tag": s.get("tag", ""),
+        }
+        for s in region.get("sub_locations") or []
+    ]
     return json.dumps(
         {
             "query": query,
@@ -100,6 +97,8 @@ def resolve_site(query: str) -> str:
             "tag": site.get("tag"),
             "primaryVinWondersCode": primary.get("code"),
             "primaryVinWondersName": primary.get("name"),
+            "attractions": attractions,
+            "subLocationCount": len(attractions),
         },
         ensure_ascii=False,
     )

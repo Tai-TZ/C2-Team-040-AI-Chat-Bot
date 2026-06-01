@@ -8,14 +8,16 @@ import {
   Calendar,
   Loader2,
 } from "lucide-react";
-import {
-  AILoadingState,
-  type AgentProgress,
-} from "@/components/dashboard/AILoadingState";
+import { AILoadingState } from "@/components/dashboard/AILoadingState";
+import { useScriptedAgentLoading } from "@/hooks/useScriptedAgentLoading";
 import { AssistantMessage } from "@/components/dashboard/AssistantMessage";
 import { formatChatApiError } from "@/lib/api/chat";
 import { streamChat } from "@/lib/chat-api";
 import type { ChatAction, ChatMessage } from "@/lib/chat-types";
+import {
+  dispatchAgentActivity,
+  IDLE_AGENT_RUN,
+} from "@/lib/agent-activity";
 import { dispatchDashboardContext } from "@/lib/dashboard-context";
 
 const quickActions = [
@@ -32,16 +34,15 @@ const WELCOME: ChatMessage = {
   id: "welcome",
   role: "assistant",
   content:
-    "Xin chào! Tôi là VinWonders Tour Guide AI. Bạn có thể hỏi về lịch trình, combo vé, hoặc sang tab Vé & Chuyến bay bên phải để xem giá vé theo ngày. Bạn muốn đi đâu?",
+    "Xin chào! Mình là Karphany — AI Concierge VinWonders. Hỏi địa điểm và ngày đi (vd: Nha Trang cuối tuần sau), mình sẽ check thời tiết, giá vé thật và hiển thị bên phải cho bạn nhé.",
 };
 
 export function ChatPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [agentProgress, setAgentProgress] = useState<AgentProgress | null>(
-    null,
-  );
+  const [loadingQuery, setLoadingQuery] = useState("");
+  const scriptedProgress = useScriptedAgentLoading(loading, loadingQuery);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -51,7 +52,7 @@ export function ChatPanel() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, loading, agentProgress, scrollToBottom]);
+  }, [messages, loading, scriptedProgress, scrollToBottom]);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -69,12 +70,8 @@ export function ChatPanel() {
       setMessages([...messages.filter((m) => m.id !== "welcome"), userMsg]);
       setInput("");
       setLoading(true);
-      setAgentProgress({
-        status: "Đang kết nối agent...",
-        lines: [],
-        progress: 5,
-        phase: "init",
-      });
+      setLoadingQuery(trimmed);
+      dispatchAgentActivity({ ...IDLE_AGENT_RUN, active: true, steps: [] });
       setError(null);
 
       setMessages((prev) => [
@@ -82,11 +79,11 @@ export function ChatPanel() {
         { id: assistantId, role: "assistant", content: "" },
       ]);
 
+      let hadReply = false;
       try {
-        await streamChat(
-          history,
-          (delta) => {
-            setAgentProgress(null);
+        await streamChat(history, {
+          onDelta: (delta) => {
+            hadReply = true;
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === assistantId
@@ -95,25 +92,49 @@ export function ChatPanel() {
               ),
             );
           },
-          (trace) => setAgentProgress(trace),
-          (structured) => {
+          onStructured: (structured) => {
+            hadReply = true;
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === assistantId ? { ...m, structured } : m,
+                m.id === assistantId
+                  ? {
+                      ...m,
+                      structured: {
+                        ...m.structured,
+                        ...structured,
+                        actions:
+                          structured.actions?.length
+                            ? structured.actions
+                            : m.structured?.actions,
+                      },
+                    }
+                  : m,
               ),
             );
           },
-          (dashboard) => {
-            dispatchDashboardContext(dashboard);
+          onDashboard: dispatchDashboardContext,
+          onAgentActivity: dispatchAgentActivity,
+          onAgentDone: (agentRun) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, agentRun } : m,
+              ),
+            );
           },
-        );
+        });
       } catch (e) {
         const msg = formatChatApiError(e);
-        setError(msg);
-        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        if (hadReply) {
+          setError(
+            `${msg} (Đã hiển thị kết quả tra cứu; bạn vẫn có thể xem giá và thời tiết bên dưới.)`,
+          );
+        } else {
+          setError(msg);
+          setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        }
       } finally {
         setLoading(false);
-        setAgentProgress(null);
+        setLoadingQuery("");
       }
     },
     [loading, messages],
@@ -124,6 +145,7 @@ export function ChatPanel() {
     setError(null);
     setInput("");
     dispatchDashboardContext({ focus: "idle" });
+    dispatchAgentActivity(IDLE_AGENT_RUN);
   }
 
   function handleMessageAction(action: ChatAction) {
@@ -147,7 +169,10 @@ export function ChatPanel() {
               <span
                 className={`h-1.5 w-1.5 rounded-full ${loading ? "bg-amber-400 animate-pulse" : "bg-success animate-pulse"}`}
               />
-              AI Concierge · {loading ? "Đang trả lời..." : "Trực tuyến"}
+              AI Concierge ·{" "}
+              {loading
+                ? scriptedProgress?.status ?? "Đang kết nối agent..."
+                : "Trực tuyến"}
             </p>
           </div>
         </div>
@@ -179,13 +204,8 @@ export function ChatPanel() {
                   : "max-w-[min(100%,28rem)] rounded-2xl rounded-tl-md border border-border bg-card px-4 py-3 text-card-foreground shadow-soft"
               }`}
             >
-              {m.role === "assistant" && !m.content && loading && agentProgress ? (
-                <AILoadingState progress={agentProgress} />
-              ) : m.role === "assistant" && !m.content && loading ? (
-                <span className="inline-flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Agent đang kết nối...
-                </span>
+              {m.role === "assistant" && !m.content && loading && scriptedProgress ? (
+                <AILoadingState progress={scriptedProgress} />
               ) : m.role === "assistant" ? (
                 <AssistantMessage
                   message={m}
