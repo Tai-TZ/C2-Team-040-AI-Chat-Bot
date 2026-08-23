@@ -10,6 +10,8 @@ env/
 node_modules/
 run_output.txt
 frontend/.vite/
+.deepeval/
+.pytest_cache/
 
 # Frontend UI
 frontend/node_modules/
